@@ -17,11 +17,12 @@ import os
 from ament_index_python.packages import get_package_share_directory
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, GroupAction, SetEnvironmentVariable
+from launch.actions import DeclareLaunchArgument, GroupAction, SetEnvironmentVariable, IncludeLaunchDescription
 from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import LoadComposableNodes, SetParameter
 from launch_ros.actions import Node, PushRosNamespace
+from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch_ros.descriptions import ComposableNode, ParameterFile
 from nav2_common.launch import RewrittenYaml
 from launch.substitutions import (
@@ -33,6 +34,7 @@ from launch.substitutions import (
 def generate_launch_description():
     # Get the launch directory
     bringup_dir = get_package_share_directory('diablo_nav2')
+    launch_dir = os.path.join(bringup_dir, 'launch')
 
     namespace = LaunchConfiguration('namespace')
     use_sim_time = LaunchConfiguration('use_sim_time')
@@ -86,8 +88,8 @@ def generate_launch_description():
                 "navigate_through_poses_bt.xml",
             ]
         ),
-        "odom_topic": "diablo/odom",
-        "map_topic": "map",
+        "odom_topic": "/diablo/odom",
+        "map_topic": "/map",
         "resolution": "0.05",
         "use_sim_time": use_sim_time,
     }
@@ -137,6 +139,12 @@ def generate_launch_description():
     declare_log_level_cmd = DeclareLaunchArgument(
         'log_level', default_value='info', description='log level'
     )
+    
+    rviz_cmd = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            os.path.join(launch_dir, 'rviz_launch.py')),
+        launch_arguments={'namespace': namespace,
+                          'rviz_config': os.path.join(bringup_dir, 'rviz', 'nav2_default_view.rviz')}.items())
 
     load_nodes = GroupAction(
         actions=[
@@ -150,7 +158,7 @@ def generate_launch_description():
                 respawn_delay=2.0,
                 parameters=[configured_params],
                 arguments=['--ros-args', '--log-level', log_level],
-                remappings=remappings #+ [('cmd_vel', 'cmd_vel_nav')],
+                remappings=remappings + [('cmd_vel', '/diablo/cmd_vel')],
             ),
             Node(
                 package='nav2_smoother',
@@ -183,7 +191,7 @@ def generate_launch_description():
                 respawn_delay=2.0,
                 parameters=[configured_params],
                 arguments=['--ros-args', '--log-level', log_level],
-                remappings=remappings #+ [('cmd_vel', 'cmd_vel_nav')],
+                remappings=remappings + [('cmd_vel', '/diablo/cmd_vel')],
             ),
             Node(
                 package='nav2_bt_navigator',
@@ -216,8 +224,8 @@ def generate_launch_description():
                 respawn_delay=2.0,
                 parameters=[configured_params],
                 arguments=['--ros-args', '--log-level', log_level],
-                remappings=remappings + [('cmd_vel_smoothed', 'cmd_vel')],
-                #+ [('cmd_vel', 'cmd_vel_nav')],
+                remappings=remappings + [('cmd_vel_smoothed', '/diablo/cmd_vel')]
+                #+ [('cmd_vel', '/diablo/cmd_vel')],
             ),
             Node(
                 package='nav2_collision_monitor',
@@ -254,6 +262,7 @@ def generate_launch_description():
     ld.add_action(declare_autostart_cmd)
     ld.add_action(declare_use_respawn_cmd)
     ld.add_action(declare_log_level_cmd)
+    ld.add_action(rviz_cmd)
     # Add the actions to launch all of the navigation nodes
     ld.add_action(load_nodes)
 

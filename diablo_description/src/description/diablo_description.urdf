@@ -131,7 +131,7 @@
       </geometry>
     </collision>
 
-    <xacro:sphere_inertia m="0.2" r="${(wheel_radius+wheel_zoff-(base_height/2))}"/>
+    <xacro:sphere_inertia m="0.01" r="${(wheel_radius+wheel_zoff-(base_height/2))}"/>
   </link>
 
   <joint name="caster_joint" type="continuous">
@@ -157,7 +157,7 @@
       </geometry>
     </collision>
 
-    <xacro:sphere_inertia m="0.2" r="${(wheel_radius+wheel_zoff-(base_height/2))}"/>
+    <xacro:sphere_inertia m="0.01" r="${(wheel_radius+wheel_zoff-(base_height/2))}"/>
   </link>
 
   <joint name="caster2_joint" type="continuous">
@@ -165,7 +165,6 @@
     <child link="back_caster"/>
     <origin xyz="${caster2_xoff} 0.0 ${-(base_height/2)}" rpy="0 0 0"/>
   </joint>
-
 
   <link name="imu_link">
     <visual>

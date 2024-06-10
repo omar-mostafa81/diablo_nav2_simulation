@@ -101,6 +101,6 @@ def generate_launch_description():
         joint_state_publisher_node,
         robot_state_publisher_node,
         spawn_entity,
-        rviz_node,
+        #rviz_node,
         rtabmap_slam
     ])

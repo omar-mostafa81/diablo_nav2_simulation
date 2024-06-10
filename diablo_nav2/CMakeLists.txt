@@ -19,6 +19,8 @@ find_package(nav_msgs REQUIRED)
 install(DIRECTORY
   launch
   params
+  rviz
+  config
   DESTINATION share/${PROJECT_NAME}/
 )
 
