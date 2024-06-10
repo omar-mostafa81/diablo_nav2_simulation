@@ -1,0 +1,20 @@
+{
+    "python.autoComplete.extraPaths": [
+        "/home/nyukl/diablo_ws/install/diablo_teleop/lib/python3.10/site-packages",
+        "/home/nyukl/diablo_ws/install/motion_msgs/local/lib/python3.10/dist-packages",
+        "/home/nyukl/diablo_ws/install/diablo_ctrl_gui/lib/python3.10/site-packages",
+        "/home/nyukl/diablo_ws/install/data_msgs/local/lib/python3.10/dist-packages",
+        "/home/nyukl/diablo_ws/install/ception_msgs/local/lib/python3.10/dist-packages",
+        "/opt/ros/humble/lib/python3.10/site-packages",
+        "/opt/ros/humble/local/lib/python3.10/dist-packages"
+    ],
+    "python.analysis.extraPaths": [
+        "/home/nyukl/diablo_ws/install/diablo_teleop/lib/python3.10/site-packages",
+        "/home/nyukl/diablo_ws/install/motion_msgs/local/lib/python3.10/dist-packages",
+        "/home/nyukl/diablo_ws/install/diablo_ctrl_gui/lib/python3.10/site-packages",
+        "/home/nyukl/diablo_ws/install/data_msgs/local/lib/python3.10/dist-packages",
+        "/home/nyukl/diablo_ws/install/ception_msgs/local/lib/python3.10/dist-packages",
+        "/opt/ros/humble/lib/python3.10/site-packages",
+        "/opt/ros/humble/local/lib/python3.10/dist-packages"
+    ]
+}

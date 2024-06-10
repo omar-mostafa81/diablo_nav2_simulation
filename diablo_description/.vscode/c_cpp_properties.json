@@ -1,0 +1,32 @@
+{
+  "configurations": [
+    {
+      "browse": {
+        "databaseFilename": "${default}",
+        "limitSymbolsToIncludedHeaders": false
+      },
+      "includePath": [
+        "/home/nyukl/diablo_ws/install/diablo_ctrl/include/**",
+        "/home/nyukl/diablo_ws/install/diablo_body/include/**",
+        "/home/nyukl/diablo_ws/install/diablo_utils/include/**",
+        "/home/nyukl/diablo_ws/install/motion_msgs/include/**",
+        "/home/nyukl/diablo_ws/install/data_msgs/include/**",
+        "/home/nyukl/diablo_ws/install/ception_msgs/include/**",
+        "/opt/ros/humble/include/**",
+        "/home/nyukl/diablo_ws/src/diablo_ros2/diablo_ception/diablo_body/include/**",
+        "/home/nyukl/diablo_ws/src/diablo_ros2/diablo_common/diablo_utils/include/**",
+        "/home/nyukl/diablo_ws/src/diablo_ros2/diablo_interaction/diablo_ctrl/include/**",
+        "/home/nyukl/diablo_ws/src/diablo_ros2/diablo_interaction/diablo_nav/include/**",
+        "/home/nyukl/diablo_ws/src/path_follower_simulation/include/**",
+        "/home/nyukl/diablo_ws/src/vrpn_client_ros2/include/**",
+        "/usr/include/**"
+      ],
+      "name": "ROS",
+      "intelliSenseMode": "gcc-x64",
+      "compilerPath": "/usr/bin/gcc",
+      "cStandard": "gnu11",
+      "cppStandard": "c++14"
+    }
+  ],
+  "version": 4
+}
