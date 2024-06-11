@@ -17,7 +17,10 @@ def generate_launch_description():
     pkg_share = launch_ros.substitutions.FindPackageShare(package='diablo_description').find('diablo_description')
     default_model_path = os.path.join(pkg_share, 'src/description/diablo_description.urdf')
     default_rviz_config_path = os.path.join(pkg_share, 'rviz/urdf_config.rviz')
-    world_path=os.path.join(pkg_share, 'world/my_world.sdf')
+    
+    #To use the turtlebot world, you have to: 
+    #export GAZEBO_MODEL_PATH=$GAZEBO_MODEL_PATH:/opt/ros/<ros2-distro>/share/turtlebot3_gazebo/models
+    world_path=os.path.join(pkg_share, 'world/arena.sdf')
     
     robot_state_publisher_node = launch_ros.actions.Node(
         package='robot_state_publisher',

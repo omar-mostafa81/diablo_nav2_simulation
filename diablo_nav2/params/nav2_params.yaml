@@ -140,7 +140,7 @@
       general_goal_checker:
         stateful: True
         plugin: "nav2_controller::SimpleGoalChecker"
-        xy_goal_tolerance: 0.5
+        xy_goal_tolerance: 0.25
         yaw_goal_tolerance: 0.1
 
       # DWB parameters
@@ -149,12 +149,12 @@
         debug_trajectory_details: True
         min_vel_x: -0.2
         min_vel_y: 0.0
-        max_vel_x: 0.5
+        max_vel_x: 0.2
         max_vel_y: 0.0
-        max_vel_theta: 1.0
+        max_vel_theta: 0.4
         min_speed_xy: 0.0
         max_speed_xy: 0.4
-        min_speed_theta: 0.0
+        min_speed_theta: -0.4
         # Add high threshold velocity for turtlebot 3 issue.
         # https://github.com/ROBOTIS-GIT/turtlebot3_simulations/issues/75
         acc_lim_x: 2.5
@@ -287,11 +287,12 @@
         width: 3
         height: 3
         resolution: 0.05
-        robot_radius: 0.22
+        robot_radius: 0.35
         plugins: ["voxel_layer", "inflation_layer"]
         #plugins: ["obstacle_layer", "inflation_layer", "voxel_layer"]
         inflation_layer:
           plugin: "nav2_costmap_2d::InflationLayer"
+          enabled: True
           cost_scaling_factor: 3.0
           inflation_radius: 0.55
         voxel_layer:
@@ -308,7 +309,7 @@
           observation_sources: "pointcloud"
           pointcloud:
             topic: "/velodyne_points"
-            max_obstacle_height: 2.0
+            max_obstacle_height: 1.0
             min_obstacle_height: 0.2
             clearing: True
             marking: True
@@ -319,12 +320,12 @@
             obstacle_min_range: 0.0
         # obstacle_layer:
         #   plugin: "nav2_costmap_2d::ObstacleLayer"
-        #   enabled: True
+        #   enabled: False
         #   observation_sources: "pointcloud"
         #   pointcloud:
         #     topic: /velodyne_points
-        #     max_obstacle_height: 2.0
-        #     clearing: False
+        #     max_obstacle_height: 1.0
+        #     clearing: True
         #     marking: True
         #     data_type: "PointCloud2"
         #     raytrace_max_range: 3.0
@@ -335,7 +336,7 @@
           plugin: "nav2_costmap_2d::StaticLayer"
           map_subscribe_transient_local: True
           #subscribe_to_updates: True
-          map_topic: "/map"
+          #map_topic: "/map"
         always_send_full_costmap: True
 
   global_costmap:
@@ -345,20 +346,22 @@
         publish_frequency: 2.0
         global_frame: "map"
         robot_base_frame: "base_link"
-        robot_radius: 0.22
+        robot_radius: 0.35
         resolution: 0.05
         use_sim_time: True
         track_unknown_space: true
         always_send_full_costmap: True
-        map_topic: "/map"
+        #map_topic: "/map"
         #plugins: ["static_layer", "obstacle_layer", "inflation_layer", "voxel_layer"]
         plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
         obstacle_layer:
           plugin: "nav2_costmap_2d::ObstacleLayer"
           enabled: True
           observation_sources: "pointcloud"
+          #combination_method: 0
           pointcloud:
             topic: /velodyne_points
+            sensor_frame: lidar_link
             max_obstacle_height: 2.0
             min_obstacle_height: 0.2
             clearing: True
@@ -372,17 +375,16 @@
         #   plugin: "nav2_costmap_2d::VoxelLayer"
         #   enabled: True
         #   publish_voxel_map: True
-        #   origin_x: -1.5
-        #   origin_y: -1.5
         #   origin_z: -0.26
         #   z_resolution: 0.05
         #   z_voxels: 16
         #   max_obstacle_height: 1.0
         #   mark_threshold: 0
         #   observation_sources: "pointcloud"
+        #   combination_method: 0
         #   pointcloud:
         #     topic: "/velodyne_points"
-        #     max_obstacle_height: 2.0
+        #     max_obstacle_height: 1.0
         #     min_obstacle_height: 0.2
         #     clearing: True
         #     marking: True
@@ -394,12 +396,12 @@
         static_layer:
           plugin: "nav2_costmap_2d::StaticLayer"
           map_subscribe_transient_local: True
-          subscribe_to_updates: True
-          map_topic: "/map"
+          #subscribe_to_updates: True
+          #map_topic: "/map"
         inflation_layer:
           plugin: "nav2_costmap_2d::InflationLayer"
-          cost_scaling_factor: 10.0
-          inflation_radius: 1.65
+          cost_scaling_factor: 3.0
+          inflation_radius: 0.55
 
   map_saver:
     ros__parameters:
@@ -501,15 +503,15 @@
         type: "polygon"
         action_type: "approach"
         footprint_topic: "local_costmap/published_footprint"
-        time_before_collision: 1.2
+        time_before_collision: 5.0
         simulation_time_step: 0.1
         min_points: 6
-        visualize: False
+        visualize: True
         enabled: True
       observation_sources: ["pointcloud"]
       pointcloud:
         type: "pointcloud"
         topic: "/velodyne_points"
-        min_height: 0.15
-        max_height: 2.0
+        min_height: 0.2
+        max_height: 1.0
         enabled: True
