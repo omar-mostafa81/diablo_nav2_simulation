@@ -8,13 +8,33 @@ endif()
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
-find_package(data_msgs REQUIRED)
+#find_package(data_msgs REQUIRED)
 find_package(motion_msgs REQUIRED)
-find_package(diablo_utils REQUIRED)
-find_package(diablo_body REQUIRED)
-find_package(sensor_msgs REQUIRED)
+#find_package(diablo_utils REQUIRED)
+#find_package(diablo_body REQUIRED)
+#find_package(sensor_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
+find_package(std_msgs REQUIRED)
+
+set(dependencies
+  rclcpp
+  #diablo_body
+  motion_msgs
+  #diablo_utils
+  nav_msgs
+  #data_msgs
+  geometry_msgs
+  #sensor_msgs
+  std_msgs
+)
+
+add_executable(goal_points_generator src/goal_points_generator.cpp)
+ament_target_dependencies(goal_points_generator ${dependencies})
+
+install(TARGETS goal_points_generator
+  DESTINATION lib/${PROJECT_NAME}
+)
 
 install(DIRECTORY
   launch

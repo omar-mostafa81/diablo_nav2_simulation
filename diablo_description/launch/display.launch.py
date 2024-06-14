@@ -20,6 +20,8 @@ def generate_launch_description():
     
     #To use the turtlebot world, you have to: 
     #export GAZEBO_MODEL_PATH=$GAZEBO_MODEL_PATH:/opt/ros/<ros2-distro>/share/turtlebot3_gazebo/models
+    #after installing:
+    #sudo apt install ros-<ros2-distro>-turtlebot3-gazebo
     world_path=os.path.join(pkg_share, 'world/arena.sdf')
     
     robot_state_publisher_node = launch_ros.actions.Node(

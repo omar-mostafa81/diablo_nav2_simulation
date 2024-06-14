@@ -246,6 +246,13 @@ def generate_launch_description():
                 arguments=['--ros-args', '--log-level', log_level],
                 parameters=[{'autostart': autostart}, {'node_names': lifecycle_nodes}],
             ),
+            Node(
+                package='diablo_nav2',
+                executable='goal_points_generator',
+                name='goal_points_generator',
+                output='screen',
+                arguments=['--ros-args', '--log-level', log_level],
+            ),
         ],
     )
 
