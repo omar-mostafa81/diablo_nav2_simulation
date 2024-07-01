@@ -16,6 +16,11 @@ find_package(motion_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(nav2_msgs REQUIRED)
+find_package(nav2_util REQUIRED)
+find_package(PCL REQUIRED)
+find_package(pcl_ros REQUIRED)
+find_package(pcl_conversions REQUIRED)
 
 set(dependencies
   rclcpp
@@ -27,12 +32,24 @@ set(dependencies
   geometry_msgs
   #sensor_msgs
   std_msgs
+  nav2_msgs
+  nav2_util
+  PCL
+  pcl_ros
+  pcl_conversions
 )
 
 add_executable(goal_points_generator src/goal_points_generator.cpp)
 ament_target_dependencies(goal_points_generator ${dependencies})
 
 install(TARGETS goal_points_generator
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+add_executable(headings_generator src/headings_generator.cpp)
+ament_target_dependencies(headings_generator ${dependencies})
+
+install(TARGETS headings_generator
   DESTINATION lib/${PROJECT_NAME}
 )
 
