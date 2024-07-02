@@ -22,7 +22,7 @@ def generate_launch_description():
     #export GAZEBO_MODEL_PATH=$GAZEBO_MODEL_PATH:/opt/ros/<ros2-distro>/share/turtlebot3_gazebo/models
     #after installing:
     #sudo apt install ros-<ros2-distro>-turtlebot3-gazebo
-    world_path=os.path.join(pkg_share, 'world/arena.sdf')
+    world_path=os.path.join(pkg_share, 'world/my_world.sdf')
     
     robot_state_publisher_node = launch_ros.actions.Node(
         package='robot_state_publisher',
