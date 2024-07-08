@@ -18,7 +18,8 @@
               <Sequence name="ComputeAndSmoothPath">
                 <ComputePathToPose goal="{goal}" path="{path}" planner_id="GridBased"/>
                 <SmoothPath unsmoothed_path="{path}" smoothed_path="{path}"/>
-              </Sequence>
+                <GoalReached goal="{goal}" robot_base_frame="base_link"/>
+              </Sequence> 
             </Fallback>
             <ClearEntireCostmap name="ClearGlobalCostmap-Context" service_name="global_costmap/clear_entirely_global_costmap"/>
           </RecoveryNode>

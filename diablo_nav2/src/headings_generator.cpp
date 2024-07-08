@@ -41,6 +41,7 @@
 #include <pcl/segmentation/sac_segmentation.h>
 #include <pcl_conversions/pcl_conversions.h>
 
+
 class HeadingsGenerator : public rclcpp::Node
 {
 public: 
@@ -64,14 +65,34 @@ public:
         
         cropped_cloud_publisher = this->create_publisher<sensor_msgs::msg::PointCloud2>(
             "/cropped_cloud", 10);
+        
+        motion_publisher = this->create_publisher<geometry_msgs::msg::Twist>(
+            "/diablo/cmd_vel", 10);
+
+         // Create a timer to check rotation status
+        rotation_timer_ = this->create_wall_timer(
+            std::chrono::milliseconds(100),
+            std::bind(&HeadingsGenerator::rotation_timer_callback, this));
 
         tf_buffer_ = std::make_shared<tf2_ros::Buffer>(this->get_clock());
         tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
         obstacles_cropped_cloud = pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>());
-        first_msg = true;
+        no_pcl = true;
+        no_obstacles = true;
+
+        // Initialize control parameters
+        forward_speed_ = 0.0;       // Forward speed
+        rotation_speed_ = 0.0;      // Rotation speed
+        position_error = 0.0;
+        rotation_error = 0.0;
+        Kv = 0.4;       // Forward gain factor
+        Kw = 0.2;      // Rotation gain factor
+        rotation_tolerance_ = 0.2;  // Rotation tolerance in radians
+        position_tolerance_ = 0.2; // Position tolerance in meters
     }
 
 private:
+
     // Helper function to check if an angle is close to any angle in the vector
     bool isAngleClose(double angle, const std::vector<double>& angles, double tolerance) {
         for (double a : angles) {
@@ -99,26 +120,33 @@ private:
     }
 
     void PointCloud2Callback(const sensor_msgs::msg::PointCloud2::SharedPtr obstacles_cloud) {
+        no_pcl = false;
         // Transform the point cloud to the map frame  
         sensor_msgs::msg::PointCloud2 transformed_obstacles_cloud;
         try {
             geometry_msgs::msg::TransformStamped transform_stamped = tf_buffer_->lookupTransform(
-                "lidar_link", obstacles_cloud->header.frame_id, tf2::TimePointZero);
+                "odom", obstacles_cloud->header.frame_id, tf2::TimePointZero);
             tf2::doTransform(*obstacles_cloud, transformed_obstacles_cloud, transform_stamped);
         } catch (tf2::TransformException &ex) {
             RCLCPP_ERROR(this->get_logger(), "Transform error: %s", ex.what());
             return;
         } 
+        transformed_obstacles_cloud = *obstacles_cloud;
         // Convert the PointCloud2 message to a PCL point cloud
-        pcl::PointCloud<pcl::PointXYZ>::Ptr obstacles_pcl_cloud(new pcl::PointCloud<pcl::PointXYZ>());
-        pcl::fromROSMsg(transformed_obstacles_cloud, *obstacles_pcl_cloud);
+        //pcl::PointCloud<pcl::PointXYZ>::Ptr obstacles_pcl_cloud(new pcl::PointCloud<pcl::PointXYZ>());
+        //pcl::fromROSMsg(transformed_obstacles_cloud, *obstacles_pcl_cloud);
         
+        pcl::PCLPointCloud2 pcl_pc2;
+        pcl_conversions::toPCL(transformed_obstacles_cloud,pcl_pc2);
+        pcl::PointCloud<pcl::PointXYZ>::Ptr obstacles_pcl_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+        pcl::fromPCLPointCloud2(pcl_pc2,*obstacles_pcl_cloud);
+
         obstacles_cropped_cloud = obstacles_pcl_cloud;
 
         // Crop the point cloud to a box with x and y are endless, z is from 0.3 to 1 meters
         pcl::CropBox<pcl::PointXYZ> crop_box_filter;
         crop_box_filter.setInputCloud(obstacles_pcl_cloud); 
-        crop_box_filter.setMin(Eigen::Vector4f(-std::numeric_limits<float>::max(), -std::numeric_limits<float>::max(), -0.1, 0.0));
+        crop_box_filter.setMin(Eigen::Vector4f(-std::numeric_limits<float>::max(), -std::numeric_limits<float>::max(), 0.0, 0.0));
         crop_box_filter.setMax(Eigen::Vector4f(std::numeric_limits<float>::max(), std::numeric_limits<float>::max(), 0.8, 0.0));
         //pcl::PointCloud<pcl::PointXYZ>::Ptr obstacles_cropped_cloud(new pcl::PointCloud<pcl::PointXYZ>());
         crop_box_filter.filter(*obstacles_cropped_cloud);
@@ -141,7 +169,7 @@ private:
 
         //Combine the 2 pcl: the velodyne_cropped_cloud + obstacles_cropped_cloud
         pcl::PointCloud<pcl::PointXYZ>::Ptr combined_cloud(new pcl::PointCloud<pcl::PointXYZ>());
-        *combined_cloud = *velodyne_cropped_cloud + *obstacles_cropped_cloud;
+        *combined_cloud = /* *velodyne_cropped_cloud + */ *obstacles_cropped_cloud;
         //*combined_cloud = *velodyne_pcl_cloud +  *obstacles_cropped_cloud;
         // Convert the cropped PCL point cloud back to a ROS message
         sensor_msgs::msg::PointCloud2 cropped_cloud_msg;
@@ -164,9 +192,11 @@ private:
             return;
         }
 
+        no_obstacles = true;
         for (const auto& point : combined_cloud->points) {
             double distance = std::sqrt(std::pow(point.x - x_c, 2) + std::pow(point.y - y_c, 2));
-            if (distance < 1) {
+            if (distance < 1.0) {
+                no_obstacles = false;
                 double angle = std::atan2(point.y - y_c, point.x - x_c) - yaw_c;
 
                 if (angle > M_PI) {
@@ -184,11 +214,8 @@ private:
         }
 
         std::vector<double> available_headings;
+        std::vector<double> ranges;
         const double degree_tolerance = 5.0 * M_PI / 180;  // 5 degrees in radians
-        // Mutex to protect the obstacle_angles set
-        std::mutex angles_mutex;
-        // Lock the mutex for safe access to obstacle_angles
-        std::lock_guard<std::mutex> lock(angles_mutex);
 
         //for (auto it = obstacle_angles.begin(); it != std::prev(obstacle_angles.end()); ++it) {
         for (auto it = obstacle_angles.begin(); it != obstacle_angles.end(); ++it) {
@@ -200,64 +227,84 @@ private:
             
             double angle1 = *it;
             double angle2 = *next_it;
-            
-            // //Convert from -pi:pi to 0:360 for easier calculations
 
-            // if (angle1 > 2 * M_PI) {
-            //     angle1 -= 2 * M_PI;
-            // } else if (angle1 < 0) {
-            //         angle1 += 2 * M_PI;
-            // }
-
-            // if (angle2 > 2 * M_PI) {
-            //     angle2 -= 2 * M_PI;
-            // } else if (angle2 < 0) {
-            //         angle2 += 2 * M_PI;
-            // }
-
-            //double diff = atan2(sin(angle2 - angle1), cos(angle2 - angle1));
+            // double diff = atan2(sin(angle2 - angle1), cos(angle2 - angle1));
+            // double range = abs(diff);
             //double diff = abs(angle2) - abs(angle1);
-
-             // Normalize angles to -pi to pi
-            //angle1 = std::atan2(std::sin(angle1), std::cos(angle1));
-            //angle2 = std::atan2(std::sin(angle2), std::cos(angle2));
-
-            double diff = std::abs(angle2 - angle1);
-            // if (diff > M_PI) {
-            //     diff = 2 * M_PI - diff;
-            // } 
-
-            if (abs(diff) >= 18 * M_PI / 180) {
+            double diff = angle2 - angle1;
+            if (diff < 0) {
+                diff += 2 * M_PI;
+            }
+            
+            if (abs(diff) >= 15 * M_PI / 180) {
 
                 double middle_angle = (angle1 + angle2)/2;
 
                 if (angle1 > angle2) {
                     middle_angle = middle_angle + M_PI;
-                }
+                } 
 
                 if (middle_angle > M_PI) {
                     middle_angle -= 2 * M_PI;
                 } else if (middle_angle < - M_PI) {
                     middle_angle += 2 * M_PI;
                 }
+
+                //Find the range of the maximum free space around the middle angle
+                // if (middle_angle - diff/2 != angle1 && middle_angle - diff/2 != angle2) {
+                //     range = abs((2*M_PI) - range);
+                // }
                 
                 if (!isAngleClose(middle_angle, available_headings, degree_tolerance)) {
-                    std::cout << "###############" << std::endl <<
-                                 "first angle: " << angle1 << std::endl <<
-                                 "second angle:" << angle2 << std::endl <<
-                                 "middle angle: " << middle_angle << std::endl;
+                    // std::cout << "###############" << std::endl <<
+                    //              "first angle: " << angle1 << std::endl <<
+                    //              "second angle:" << angle2 << std::endl <<
+                    //              "middle angle: " << middle_angle << std::endl <<
+                    //              "range: " << diff << std::endl;
                     available_headings.push_back(middle_angle);
+                    ranges.push_back(abs(diff));
                 }
             }
+        }
+
+        //If no obstacles detected but there are pcl2 detected, publish the main 4 directions as available headings
+        //If no pcl2 are detected, make the robot rotate for 2 seconds
+        if (!no_pcl && no_obstacles) {
+            double angle1 = 0.0;
+            double angle2 = M_PI;
+            double angle3 = -M_PI;
+            double angle4 = M_PI/2; 
+            available_headings.push_back(angle1);
+            ranges.push_back(M_PI/2);
+            available_headings.push_back(angle2);
+            ranges.push_back(M_PI/2);
+            available_headings.push_back(angle3);
+            ranges.push_back(M_PI/2);
+            available_headings.push_back(angle4);
+            ranges.push_back(M_PI/2);
+        } else if (no_pcl && no_obstacles) {
+            //rotate 45 degrees to update the octomap and start getting pointclouds
+            rotate_to(M_PI/4);
         }
         // Close the file
         angle_file.close();
         //Publish the available headings
+        // Combine the headings and ranges, then sort by range
+        std::vector<std::pair<double, double>> sorted_headings_with_ranges = sortHeadingsByRange(available_headings, ranges);
+
+        // Extract the sorted headings
+        std::vector<double> sorted_headings;
+        for (const auto& pair : sorted_headings_with_ranges) {
+            sorted_headings.push_back(pair.second);
+        }
+
+        // Publish the sorted headings
         std_msgs::msg::Float64MultiArray msg;
-        msg.data = available_headings;
+        msg.data = sorted_headings;
         available_headings_publisher->publish(msg);
+
         
-    
+        //The following algorithm will give all available headings, with overlapping
         // Define the range and step size
         // double angle_increment = 1.0 * M_PI / 180.0; // Increment by 1 degree in radians
         // double range_size = 36.0 * M_PI / 180.0; // 18 is enough to give 60 cm (robot's diameter) at distance 2 meters
@@ -308,12 +355,74 @@ private:
         //     }
         //}
     }
+    
+    rclcpp::TimerBase::SharedPtr rotation_timer_;
+    double target_yaw;
+
+    void rotate_to(double angle_in_radians) {
+        target_yaw = yaw_c + angle_in_radians;
+        // Normalize the target yaw to be within -pi to pi
+        if (target_yaw > M_PI) {
+            target_yaw -= 2 * M_PI;
+        } else if (target_yaw < -M_PI) {
+            target_yaw += 2 * M_PI;
+        }
+        rotation_in_progress = true;
+        // Initial call to update errors and publish the first command
+        update_rotation();
+    }
+
+    void update_rotation() {
+        rotation_error = target_yaw - yaw_c;
+
+        // Normalize the rotation error to be within -pi to pi
+        if (rotation_error > M_PI) {
+            rotation_error -= 2 * M_PI;
+        } else if (rotation_error < -M_PI) {
+            rotation_error += 2 * M_PI;
+        }
+
+        rotation_speed_ = Kw * rotation_error;
+
+        geometry_msgs::msg::Twist cmd;
+        cmd.linear.x = 0.0; // No forward movement
+        cmd.angular.z = rotation_speed_;
+        motion_publisher->publish(cmd);
+
+        if (abs(rotation_error) <= rotation_tolerance_) {
+            cmd.linear.x = 0.0;
+            cmd.angular.z = 0.0;
+            motion_publisher->publish(cmd);
+            RCLCPP_INFO(this->get_logger(), "Rotated 45 degrees.");
+            rotation_in_progress = false;
+        }
+    }
+
+    void rotation_timer_callback() {
+        if (rotation_in_progress) {
+            update_rotation();
+        }
+    }
+
+    // Helper function to sort headings based on ranges
+    std::vector<std::pair<double, double>> sortHeadingsByRange(
+        const std::vector<double>& headings,
+        const std::vector<double>& ranges) {
+        std::vector<std::pair<double, double>> paired;
+        for (size_t i = 0; i < headings.size(); ++i) {
+            paired.emplace_back(ranges[i], headings[i]);
+        }
+        std::sort(paired.rbegin(), paired.rend());  // Sort in descending order based on range
+        return paired;
+    }
+
 
     rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr velodyne_points_subscriber;
     rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr octomap_obstacles_subscriber;
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_subscriber;
     rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr available_headings_publisher;
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr cropped_cloud_publisher;
+    rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr motion_publisher;
 
     std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
     std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
@@ -321,7 +430,16 @@ private:
     pcl::PointCloud<pcl::PointXYZ>::Ptr obstacles_cropped_cloud; 
 
     double x_c, y_c, yaw_c, initial_yaw;
-    bool first_msg;
+    bool no_pcl, no_obstacles;
+    double forward_speed_;
+    double rotation_speed_;
+    double rotation_tolerance_;
+    double position_tolerance_;
+    double Kv;
+    double Kw;
+    double position_error;
+    double rotation_error;
+    bool rotation_in_progress;
 };
 
 int main(int argc, char * argv[])
