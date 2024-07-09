@@ -275,16 +275,17 @@ private:
             double angle3 = -M_PI;
             double angle4 = M_PI/2; 
             available_headings.push_back(angle1);
-            ranges.push_back(M_PI/2);
+            //Make it prefer moving forward, then backward, then to the right, then to the left
+            ranges.push_back(M_PI*2);
             available_headings.push_back(angle2);
             ranges.push_back(M_PI/2);
             available_headings.push_back(angle3);
             ranges.push_back(M_PI/2);
             available_headings.push_back(angle4);
-            ranges.push_back(M_PI/2);
+            ranges.push_back(M_PI);
         } else if (no_pcl && no_obstacles) {
             //rotate 45 degrees to update the octomap and start getting pointclouds
-            rotate_to(M_PI/4);
+            //rotate_to(M_PI/4);
         }
         // Close the file
         angle_file.close();

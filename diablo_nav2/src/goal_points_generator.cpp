@@ -137,21 +137,30 @@ private:
         //Save the time from the odom because simulation time is used
         latest_odom_time_ = msg->header.stamp;
 
+        geometry_msgs::msg::PoseStamped pose_in1, pose_out1;
+        pose_in1.pose = msg->pose.pose;
+        pose_in1.header = msg->header;
+        //Transform from "odom" frame to velodyne frame
+        try {
+            tf_buffer_->transform(pose_in1, pose_out1, "map", tf2::durationFromSec(1.0));
+        } catch (tf2::TransformException &ex) {
+            RCLCPP_WARN(rclcpp::get_logger("rclcpp"), "Could not transform %s to map: %s", msg->header.frame_id.c_str(), ex.what());
+            return;
+        }
+
         //Extract the positions
-        x_global_frame = msg->pose.pose.position.x;
-        y_global_frame = msg->pose.pose.position.y;
+        x_global_frame = pose_out1.pose.position.x;
+        y_global_frame = pose_out1.pose.position.y;
 
         // Extract Yaw angle
-        double quat_x1 = msg->pose.pose.orientation.x;
-        double quat_y1 = msg->pose.pose.orientation.y;
-        double quat_z1 = msg->pose.pose.orientation.z;
-        double quat_w1 = msg->pose.pose.orientation.w;
+        double quat_x1 = pose_out1.pose.orientation.x;
+        double quat_y1 = pose_out1.pose.orientation.y;
+        double quat_z1 = pose_out1.pose.orientation.z;
+        double quat_w1 = pose_out1.pose.orientation.w;
 
         double siny_cosp1 = 2.0 * (quat_w1 * quat_z1 + quat_x1 * quat_y1);
         double cosy_cosp1 = 1.0 - 2.0 * (quat_y1 * quat_y1 + quat_z1 * quat_z1);
         yaw_global_frame = atan2(siny_cosp1, cosy_cosp1);
-
-        //std::cout << "X position: " << x_global_frame << ", Y position: " << y_global_frame << std::endl;
 
         geometry_msgs::msg::PoseStamped pose_in, pose_out;
         pose_in.pose = msg->pose.pose;
@@ -164,6 +173,10 @@ private:
             return;
         }
 
+        //Extract the positions
+        x_c = pose_out.pose.position.x;
+        y_c = pose_out.pose.position.y;
+
         // Extract Yaw angle
         double quat_x = pose_out.pose.orientation.x;
         double quat_y = pose_out.pose.orientation.y;
@@ -174,6 +187,7 @@ private:
         double cosy_cosp = 1.0 - 2.0 * (quat_y * quat_y + quat_z * quat_z);
         yaw_c = atan2(siny_cosp, cosy_cosp);
 
+        //std::cout << "yaw map frame: " << yaw_global_frame << ", yaw lidar frame: " << yaw_c << std::endl;
     }
 
     void availableHeadingsCallback(const std_msgs::msg::Float64MultiArray::SharedPtr msg)
@@ -290,9 +304,11 @@ private:
                 break;
             case rclcpp_action::ResultCode::ABORTED:
                 RCLCPP_ERROR(this->get_logger(), "Goal was aborted");
+                goal_reached_ = true;
                 return;
             case rclcpp_action::ResultCode::CANCELED:
                 RCLCPP_ERROR(this->get_logger(), "Goal was canceled");
+                goal_reached_ = true;
                 return;
             default:
                 RCLCPP_ERROR(this->get_logger(), "Unknown result code");
@@ -327,7 +343,7 @@ private:
     {
         while(!received_microphone_heading && exploration_called) {
             exploration_step++;
-            std::cout << "Exploration step " << exploration_step << " has started" << std::endl;
+            RCLCPP_INFO(this->get_logger(), "Exploration Step %d has started.", exploration_step);
             const double half_plane_range = M_PI / 2;  // 90 degrees
 
             // First, consider the semi-plane centered around the robot's current forward orientation
@@ -343,7 +359,7 @@ private:
 
             // Half-plane at yaw_c + 90 degrees
             // Half-planes are constructed by taking the area to the LEFT of the vector
-            double angle_minus_90 = yaw_global_frame - M_PI_2;
+            double angle_minus_90 = yaw_global_frame - M_PI/2;
             //Normalize the angle to be within pi to -pi
             if (angle_minus_90 > M_PI) {
                 angle_minus_90 -= 2 * M_PI;
@@ -358,39 +374,66 @@ private:
             RCLCPP_INFO(this->get_logger(), "Current Semi-plane was created and added to the list.");
             RCLCPP_INFO(this->get_logger(), "Semi-plane is the area to the LEFT of the vector from (%Lf,%Lf) to (%Lf, %Lf).", 
             current_position.x, current_position.y, end_minus_90.x, end_minus_90.y);
+            RCLCPP_INFO(this->get_logger(), "Current yaw of the robot is: %f.", yaw_global_frame);
 
             // Compute the intersection of half-planes
             std::vector<Point> intersection = hp_intersect(halfplanes);
 
-            // Find the best heading within the intersection
-            if (!intersection.empty()) {
-                double best_heading = available_headings_.front();  // Default to the first available heading
-                /*
+            // In the startExploration function, before returning the intersection points
+            std::ofstream intersection_file;
+            intersection_file.open("src/diablo_nav2_simulation/diablo_nav2/src/intersection_points.txt");
+            int point_num = 0;
+            std::cout << "##################" << std::endl;
+            std::cout << "The intersection consists of the points: " << std::endl;
+            for (const auto& point : intersection) {
+                point_num++;
+                std::cout << "Point " << point_num << " : (" << point.x << "," << point.y << ")" << std::endl;
+                intersection_file << point.x << " " << point.y << "\n";
+            }
+            intersection_file.close();
+
+             /*
                 For each point in the intersection (which is the convex polygon formed by the intersection of the semi-planes), check if the direction vector keeps the robot inside the intersection.
                 This is done using the cross product of the direction vector and the vector from the current position to each point in the intersection. If the cross product is negative (considering a small epsilon value for precision), the point is to the right of the direction vector, indicating that the robot would move outside the intersection if it followed this heading.
                 If for any point in the intersection, the cross product is negative, the heading is not valid (i.e., it would lead the robot outside the intersection), and we set the flag inside to false.
-                */
+             */
+
+            // Find the best heading within the intersection
+            if (!intersection.empty()) {
+                double best_heading;
+                bool heading_found = false;
+
                 for (const auto& heading : available_headings_) {
-                    Point direction(cos(heading), sin(heading));
-                    Point position(x_c, y_c);
-                    bool inside = true;
-                    for (const auto& point : intersection) {
-                        if (cross(direction, point - position) < -eps) {
-                            inside = false;
-                            break;
-                        }
+                    double angle_diff = heading + yaw_global_frame;
+                    // Normalize the angle to be within pi to -pi
+                    if (angle_diff > M_PI) {
+                        angle_diff -= 2 * M_PI;
+                    } else if (angle_diff < -M_PI) {
+                        angle_diff += 2 * M_PI;
                     }
-                    if (inside) {
+                    Point goal_position(
+                        x_global_frame + cos(angle_diff),
+                        y_global_frame + sin(angle_diff)
+                    );
+
+                    std::cout << "Goal point is (" << goal_position.x << "," << goal_position.y << "), for the heading: " << heading << std::endl;
+
+                    if (point_in_polygon(goal_position, intersection)) {
                         best_heading = heading;
+                        heading_found = true;
                         break;
                     }
                 }
-                moveTowardsHeading(best_heading);
-                RCLCPP_INFO(this->get_logger(), "The heading %f was found at the intersection of ALL semi-planes.", best_heading);
-                return;
-            } else {
-                RCLCPP_WARN(this->get_logger(), "No available headings found in the intersection of the semi-planes.");
-            }
+
+                if (heading_found) {
+                    moveTowardsHeading(best_heading);
+                    RCLCPP_INFO(this->get_logger(), "The heading %f was found at the intersection of ALL semi-planes.", best_heading);
+                    return;
+                } else {
+                    RCLCPP_WARN(this->get_logger(), "No available headings found in the intersection of the semi-planes.");
+                }
+            } 
+
 
             // If no intersection, consider only the current semi-plane
             for (const auto& heading : available_headings_) {
@@ -411,6 +454,8 @@ private:
             }
 
             RCLCPP_WARN(this->get_logger(), "No available headings found in any semi-plane.");
+            //Logic here to make the robot consider different branches from the tree. 
+            return;
 
         }
     }
@@ -539,6 +584,36 @@ private:
         } catch (tf2::TransformException& ex) {
             RCLCPP_WARN(this->get_logger(), "Could not transform goal_pose: %s", ex.what());
         }
+    }
+
+    // Checking if a point is inside a polygon
+    bool point_in_polygon(Point point, const std::vector<Point>& polygon) {
+        int num_vertices = polygon.size();
+        long double x = point.x, y = point.y;
+        bool inside = false;
+
+        Point p1 = polygon[0], p2;
+
+        for (int i = 1; i <= num_vertices; i++) {
+            p2 = polygon[i % num_vertices];
+
+            if (y > std::min(p1.y, p2.y)) {
+                if (y <= std::max(p1.y, p2.y)) {
+                    if (x <= std::max(p1.x, p2.x)) {
+                        if (p1.y != p2.y) {
+                            long double x_intersection = (y - p1.y) * (p2.x - p1.x) / (p2.y - p1.y) + p1.x;
+                            if (p1.x == p2.x || x <= x_intersection) {
+                                inside = !inside;
+                            }
+                        }
+                    }
+                }
+            }
+
+            p1 = p2;
+        }
+
+        return inside;
     }
 
     rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr headings_subscriber;
