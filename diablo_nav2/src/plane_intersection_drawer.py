@@ -31,8 +31,8 @@ def plot_polygon(points):
     plt.grid(True)
     
     # Set the limits to zoom in to the first 100 meters
-    plt.xlim(-5, 5)
-    plt.ylim(-5, 5)
+    plt.xlim(-30, 30)
+    plt.ylim(-30, 30)
     
     # Annotate each point with its coordinates
     for i in range(len(points) - 1):  # Exclude the duplicated last point

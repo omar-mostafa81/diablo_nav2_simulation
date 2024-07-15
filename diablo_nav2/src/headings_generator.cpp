@@ -195,7 +195,7 @@ private:
         no_obstacles = true;
         for (const auto& point : combined_cloud->points) {
             double distance = std::sqrt(std::pow(point.x - x_c, 2) + std::pow(point.y - y_c, 2));
-            if (distance < 1.0) {
+            if (distance < 1) {
                 no_obstacles = false;
                 double angle = std::atan2(point.y - y_c, point.x - x_c) - yaw_c;
 
@@ -216,6 +216,7 @@ private:
         std::vector<double> available_headings;
         std::vector<double> ranges;
         const double degree_tolerance = 5.0 * M_PI / 180;  // 5 degrees in radians
+        double min_angle = 41 * M_PI / 180; 
 
         //for (auto it = obstacle_angles.begin(); it != std::prev(obstacle_angles.end()); ++it) {
         for (auto it = obstacle_angles.begin(); it != obstacle_angles.end(); ++it) {
@@ -236,7 +237,7 @@ private:
                 diff += 2 * M_PI;
             }
             
-            if (abs(diff) >= 15 * M_PI / 180) {
+            if (abs(diff) >= min_angle) {
 
                 double middle_angle = (angle1 + angle2)/2;
 
@@ -264,6 +265,119 @@ private:
                     available_headings.push_back(middle_angle);
                     ranges.push_back(abs(diff));
                 }
+
+                // Add additional headings if range is greater than 54 degrees
+                if (abs(diff) > min_angle*2 ) {
+                    double first_heading = (angle1 + middle_angle) / 2.0;
+                    double second_heading = (angle2 + middle_angle) / 2.0;
+
+                    if (angle1 > middle_angle) {
+                        first_heading = first_heading + M_PI;
+                    } 
+
+                    if (middle_angle > angle2) {
+                        second_heading = second_heading + M_PI;
+                    } 
+
+                    if (first_heading > M_PI) {
+                        first_heading -= 2 * M_PI;
+                    }
+                    if (first_heading < -M_PI) {
+                        first_heading += 2 * M_PI;
+                    }
+
+                    if (second_heading > M_PI) {
+                        second_heading -= 2 * M_PI;
+                    }
+                    if (second_heading < -M_PI) {
+                        second_heading += 2 * M_PI;
+                    }
+
+                    if (!isAngleClose(first_heading, available_headings, degree_tolerance)) {
+                        available_headings.push_back(first_heading);
+                        ranges.push_back(diff/2);
+                    }
+                    if (!isAngleClose(second_heading, available_headings, degree_tolerance)) {
+                        available_headings.push_back(second_heading);
+                        ranges.push_back(diff/2);
+                    }
+
+                    // Add additional headings if the new range is greater than 54 degrees
+                    if (abs(diff/2) > min_angle*2) {
+                        // Third angle is between angle1 and first_heading
+                        double third_heading = (angle1 + first_heading) / 2;
+                        // Fourth angle is between first_heading and middle angle
+                        double fourth_heading = (first_heading + middle_angle) / 2;
+                        // Fifth Angle is between middle angle and second_heading
+                        double fifth_heading = (middle_angle + second_heading) / 2;
+                        // Sixth Angle is between second_heading and angle2
+                        double sixth_heading = (second_heading + angle2) / 2;
+
+                        if (angle1 > first_heading) {
+                            third_heading += M_PI;
+                        }
+                        if (first_heading > middle_angle) {
+                            fourth_heading += M_PI;
+                        }
+                        if (middle_angle > second_heading) {
+                            fifth_heading += M_PI;
+                        }
+                        if (second_heading > angle2) {
+                            sixth_heading += M_PI;
+                        }
+
+                        if (third_heading > M_PI) {
+                            third_heading -= 2 * M_PI;
+                        }
+                        if (third_heading < -M_PI) {
+                            third_heading += 2 * M_PI;
+                        }
+
+                        if (fourth_heading > M_PI) {
+                            fourth_heading -= 2 * M_PI;
+                        }
+                        if (fourth_heading < -M_PI) {
+                            fourth_heading += 2 * M_PI;
+                        }
+
+                        if (fifth_heading > M_PI) {
+                            fifth_heading -= 2 * M_PI;
+                        }
+                        if (fifth_heading < -M_PI) {
+                            fifth_heading += 2 * M_PI;
+                        }   
+
+                        if (sixth_heading > M_PI) {
+                            sixth_heading -= 2 * M_PI;
+                        }
+                        if (sixth_heading < -M_PI) {
+                            sixth_heading += 2 * M_PI;
+                        }
+
+                        std::cout << angle1 << "," << angle2 << "," << middle_angle << "," << first_heading << "," << second_heading << "," 
+                                  << third_heading << "," << fourth_heading << "," << fifth_heading << "," << sixth_heading << "."
+                                  << std::endl;
+
+                        if (!isAngleClose(third_heading, available_headings, degree_tolerance)) {
+                            available_headings.push_back(third_heading);
+                            ranges.push_back(diff/4);
+                        }
+                        if (!isAngleClose(fourth_heading, available_headings, degree_tolerance)) {
+                            available_headings.push_back(fourth_heading);
+                            ranges.push_back(diff/4);
+                        }
+                        if (!isAngleClose(fifth_heading, available_headings, degree_tolerance)) {
+                            available_headings.push_back(fifth_heading);
+                            ranges.push_back(diff/4);
+                        }
+                        if (!isAngleClose(sixth_heading, available_headings, degree_tolerance)) {
+                            available_headings.push_back(sixth_heading);
+                            ranges.push_back(diff/4);
+                        }
+                        
+                    }
+                   
+                }
             }
         }
 
@@ -272,7 +386,7 @@ private:
         if (!no_pcl && no_obstacles) {
             double angle1 = 0.0;
             double angle2 = M_PI;
-            double angle3 = -M_PI;
+            double angle3 = -M_PI/2;
             double angle4 = M_PI/2; 
             available_headings.push_back(angle1);
             //Make it prefer moving forward, then backward, then to the right, then to the left

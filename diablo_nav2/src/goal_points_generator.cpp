@@ -98,9 +98,8 @@ public:
                             received_microphone_heading(false),
                             exploration_called(false),
                             first_goal_received(false),
-                            last_heading_time_(this->now()),
-                            exploration_step(0)
-    {
+                            last_heading_time_(this->now())
+        {
         // Create a subscriber to the "headings" topic from the microphone
         headings_subscriber = this->create_subscription<std_msgs::msg::Float64>(
             "/microphone/headings", 10,
@@ -126,6 +125,11 @@ public:
         std::chrono::milliseconds(100), std::bind(&GoalPointsGenerator::explore, this));
 
         navigate_to_pose_client_ = rclcpp_action::create_client<NavigateToPose>(this, "navigate_to_pose");
+        first_plane_created = false;
+        returning_to_initial_position_ = false;
+        initial_x = 0.0; initial_y = 0.0; initial_yaw = 0.0;
+        returned_back = false;
+        exploration_step = 0; // Reset exploration step
 
     }
 
@@ -230,7 +234,7 @@ private:
 
         // geometry_msgs::msg::PoseStamped transformed_goal_pose;
 
-        // // Transform the goal_pose to the "map" frame
+        // // Tra bnsform the goal_pose to the "map" frame
         // try
         // {
         //     // Use the same timestamp for the transform lookup
@@ -281,6 +285,7 @@ private:
     {
         if (!goal_handle) {
             RCLCPP_ERROR(this->get_logger(), "Goal was rejected by server");
+            goal_reached_ = true;
         } else {
             RCLCPP_INFO(this->get_logger(), "Goal accepted by server, waiting for result");
         }
@@ -301,6 +306,10 @@ private:
             case rclcpp_action::ResultCode::SUCCEEDED:
                 RCLCPP_INFO(this->get_logger(), "Goal was reached");
                 goal_reached_ = true;
+                if (returning_to_initial_position_) {
+                    returning_to_initial_position_ = false;
+                    resetOrientationAndExplore();
+                }
                 break;
             case rclcpp_action::ResultCode::ABORTED:
                 RCLCPP_ERROR(this->get_logger(), "Goal was aborted");
@@ -328,7 +337,6 @@ private:
                 // Start the exploration process
                 //A flag is used to ensure that the startExploration function won't start before the goal >1 is reached 
                 exploration_called = true;
-
                 startExploration();
                 RCLCPP_INFO(this->get_logger(), "Exploration algorithm is running until a heading is received from the microphone.");
 
@@ -338,12 +346,19 @@ private:
             }
         }
     }
-
+    
     void startExploration()
     {
         while(!received_microphone_heading && exploration_called) {
-            exploration_step++;
-            RCLCPP_INFO(this->get_logger(), "Exploration Step %d has started.", exploration_step);
+            
+            //Save the initial pose of the robot
+            if (!first_plane_created) {
+                initial_x = x_global_frame;
+                initial_y = y_global_frame;
+                initial_yaw = yaw_global_frame;
+                first_plane_created = true;
+            }
+
             const double half_plane_range = M_PI / 2;  // 90 degrees
 
             // First, consider the semi-plane centered around the robot's current forward orientation
@@ -391,37 +406,76 @@ private:
                 intersection_file << point.x << " " << point.y << "\n";
             }
             intersection_file.close();
-
              /*
                 For each point in the intersection (which is the convex polygon formed by the intersection of the semi-planes), check if the direction vector keeps the robot inside the intersection.
                 This is done using the cross product of the direction vector and the vector from the current position to each point in the intersection. If the cross product is negative (considering a small epsilon value for precision), the point is to the right of the direction vector, indicating that the robot would move outside the intersection if it followed this heading.
                 If for any point in the intersection, the cross product is negative, the heading is not valid (i.e., it would lead the robot outside the intersection), and we set the flag inside to false.
              */
-
             // Find the best heading within the intersection
             if (!intersection.empty()) {
                 double best_heading;
                 bool heading_found = false;
+                double min_angle_diff = std::numeric_limits<double>::max();
+
+                // for (const auto& heading : available_headings_) {
+                //     double angle_diff = heading + yaw_global_frame;
+                //     // Normalize the angle to be within pi to -pi
+                //     if (angle_diff > M_PI) {
+                //         angle_diff -= 2 * M_PI;
+                //     } else if (angle_diff < -M_PI) {
+                //         angle_diff += 2 * M_PI;
+                //     }
+                //     Point goal_position(
+                //         x_global_frame + cos(angle_diff),
+                //         y_global_frame + sin(angle_diff)
+                //     );
+
+                //     std::cout << "Goal point is (" << goal_position.x << "," << goal_position.y << "), for the heading: " << heading << std::endl;
+
+                //     if (point_in_polygon(goal_position, intersection)) {
+                //         best_heading = heading;
+                //         heading_found = true;
+                //         break;
+                //     }
+                // }
 
                 for (const auto& heading : available_headings_) {
-                    double angle_diff = heading + yaw_global_frame;
+                    double heading_global_frame = heading + yaw_global_frame;
+                    // Normalize the angle to be within pi to -pi
+                    if (heading_global_frame > M_PI) {
+                        heading_global_frame -= 2 * M_PI;
+                    } else if (heading_global_frame < -M_PI) {
+                        heading_global_frame += 2 * M_PI;
+                    }
+
+                    double initial_yaw_InCurrentStep = initial_yaw + exploration_step * M_PI / 2;
+                    // Normalize the angle to be within pi to -pi
+                    if (initial_yaw_InCurrentStep > M_PI) {
+                        initial_yaw_InCurrentStep -= 2 * M_PI;
+                    } else if (initial_yaw_InCurrentStep < -M_PI) {
+                        initial_yaw_InCurrentStep += 2 * M_PI;
+                    }
+
+                    //double angle_diff = std::abs(heading_global_frame - initial_yaw_InCurrentStep);
+                    double angle_diff = abs(atan2(sin(heading_global_frame - initial_yaw_InCurrentStep), cos(heading_global_frame - initial_yaw_InCurrentStep)));
                     // Normalize the angle to be within pi to -pi
                     if (angle_diff > M_PI) {
                         angle_diff -= 2 * M_PI;
                     } else if (angle_diff < -M_PI) {
                         angle_diff += 2 * M_PI;
                     }
+                                        
                     Point goal_position(
-                        x_global_frame + cos(angle_diff),
-                        y_global_frame + sin(angle_diff)
+                        x_global_frame + cos(heading_global_frame),
+                        y_global_frame + sin(heading_global_frame)
                     );
 
                     std::cout << "Goal point is (" << goal_position.x << "," << goal_position.y << "), for the heading: " << heading << std::endl;
-
-                    if (point_in_polygon(goal_position, intersection)) {
+                    std::cout << "Its angle diff is: " << angle_diff << std::endl;
+                    if (point_in_polygon(goal_position, intersection) && angle_diff < min_angle_diff) {
                         best_heading = heading;
+                        min_angle_diff = angle_diff;
                         heading_found = true;
-                        break;
                     }
                 }
 
@@ -434,33 +488,134 @@ private:
                 }
             } 
 
+             //Allow to return back only once or forward in the current semi plane only once
+            if (returned_back) {
+                RCLCPP_WARN(this->get_logger(), "Resetting position and Orientation.");
+                returning_to_initial_position_ = true;
+                resetOrientationAndExplore();
+                returned_back = false;
+                return;
+            }
 
             // If no intersection, consider only the current semi-plane
             for (const auto& heading : available_headings_) {
                 if (isWithinSemiPlane(heading, forward_center, half_plane_range)) {
                     moveTowardsHeading(heading);
-                    RCLCPP_INFO(this->get_logger(), "The heading %f was found at the CURRENT forward semi-plane.", heading);
+                    //change name later
+                    returned_back = true;
+                    RCLCPP_INFO(this->get_logger(), "The heading %f was found at the current FORWARD semi-plane.", heading);
                     return;
-                }
+                } 
             }
 
             // If no available headings in the current semi-plane, consider the backward semi-plane
             for (const auto& heading : available_headings_) {
                 if (isWithinSemiPlane(heading, backward_center, half_plane_range)) {
                     moveTowardsHeading(heading);
-                     RCLCPP_INFO(this->get_logger(), "The heading %f was found at the CURRENT backward semi-plane.", heading);
+                    returned_back = true;
+                     RCLCPP_INFO(this->get_logger(), "The heading %f was found at the current BACKWARD semi-plane.", heading);
                     return;
-                }
+                } 
             }
 
             RCLCPP_WARN(this->get_logger(), "No available headings found in any semi-plane.");
-            //Logic here to make the robot consider different branches from the tree. 
-            return;
-
+            //return;
         }
     }
 
-    // Actual algorithm
+    void resetOrientationAndExplore()
+    {
+        if (returning_to_initial_position_) {
+            RCLCPP_INFO(this->get_logger(), "Returning to initial position and resetting orientation.");
+            returnToInitialPosition();
+        } else {
+            // Reset the flag 
+            goal_reached_ = false;
+            // Clear all the half-planes from the vector
+            halfplanes.clear();
+            // Restart the exploration process and stop if done
+            if (exploration_step <= 3) {
+                exploration_called = true;
+                startExploration();
+            }
+        }
+    }
+
+    void returnToInitialPosition()
+    {
+        //Change the initial orientation based on the exploration step
+        exploration_step++;
+        if (exploration_step > 3) {
+            //Stop the Exploration process
+            std::cout << "Exploration process has ended." << std::endl;
+        }
+
+        double new_orientation = initial_yaw + exploration_step * M_PI / 2;
+        if (new_orientation > M_PI) {
+            new_orientation -= 2 * M_PI;
+        } else if (new_orientation < -M_PI) {
+            new_orientation += 2 * M_PI;
+        }
+        // Create the goal pose for the initial position
+        geometry_msgs::msg::PoseStamped initial_goal_pose;
+        initial_goal_pose.header.stamp = latest_odom_time_;
+        initial_goal_pose.header.frame_id = "map";  
+
+        initial_goal_pose.pose.position.x = initial_x;
+        initial_goal_pose.pose.position.y = initial_y;
+        initial_goal_pose.pose.position.z = 0.0;
+
+        // Set the initial orientation
+        tf2::Quaternion q;
+        q.setRPY(0, 0, new_orientation);
+        initial_goal_pose.pose.orientation = tf2::toMsg(q);
+
+        // Publish the initial goal pose
+        sendGoal(std::make_shared<geometry_msgs::msg::PoseStamped>(initial_goal_pose));
+
+        // Set a flag to indicate that the robot is returning to the initial position
+        exploration_called = false;
+        returning_to_initial_position_ = true;
+    }
+
+    void moveTowardsHeading(double heading)
+    {
+        //Stop Exploration untill the goal is reached
+        exploration_called = false;
+        double distance = 1.0;  // Define the distance for travel
+
+        // Calculate the goal positions based on the current position and heading
+        double x_goal = x_c + distance * cos(heading);
+        double y_goal = y_c + distance * sin(heading);
+
+        // Convert heading angle to quaternion
+        tf2::Quaternion q;
+        q.setRPY(0, 0, heading);
+
+        geometry_msgs::msg::PoseStamped goal_pose;
+        goal_pose.header.stamp = latest_odom_time_;
+        goal_pose.header.frame_id = "lidar_link";  // Initial frame
+
+        goal_pose.pose.position.x = x_goal;
+        goal_pose.pose.position.y = y_goal;
+        goal_pose.pose.position.z = 0.0;
+        goal_pose.pose.orientation = tf2::toMsg(q);
+
+        geometry_msgs::msg::PoseStamped transformed_goal_pose;
+
+        // Transform the goal_pose to the "map" frame
+        try {
+            // Use the same timestamp for the transform lookup
+            tf_buffer_->transform(goal_pose, transformed_goal_pose, "map", tf2::durationFromSec(1.0));
+
+            // Publish the transformed goal_pose
+            sendGoal(std::make_shared<geometry_msgs::msg::PoseStamped>(transformed_goal_pose));
+        } catch (tf2::TransformException& ex) {
+            RCLCPP_WARN(this->get_logger(), "Could not transform goal_pose: %s", ex.what());
+        }
+    }
+
+    // Algorithm to find the polygon created by the intersection of half-planes
     std::vector<Point> hp_intersect(std::vector<Halfplane>& H) { 
 
         Point box[4] = {  // Bounding box in CCW order
@@ -549,43 +704,6 @@ private:
         }
     }
 
-    void moveTowardsHeading(double heading)
-    {
-        //Stop Exploration untill the goal is reached
-        exploration_called = false;
-        double distance = 1.0;  // Define the distance for travel
-
-        // Calculate the goal positions based on the current position and heading
-        double x_goal = x_c + distance * cos(heading);
-        double y_goal = y_c + distance * sin(heading);
-
-        // Convert heading angle to quaternion
-        tf2::Quaternion q;
-        q.setRPY(0, 0, heading);
-
-        geometry_msgs::msg::PoseStamped goal_pose;
-        goal_pose.header.stamp = latest_odom_time_;
-        goal_pose.header.frame_id = "lidar_link";  // Initial frame
-
-        goal_pose.pose.position.x = x_goal;
-        goal_pose.pose.position.y = y_goal;
-        goal_pose.pose.position.z = 0.0;
-        goal_pose.pose.orientation = tf2::toMsg(q);
-
-        geometry_msgs::msg::PoseStamped transformed_goal_pose;
-
-        // Transform the goal_pose to the "map" frame
-        try {
-            // Use the same timestamp for the transform lookup
-            tf_buffer_->transform(goal_pose, transformed_goal_pose, "map", tf2::durationFromSec(1.0));
-
-            // Publish the transformed goal_pose
-            sendGoal(std::make_shared<geometry_msgs::msg::PoseStamped>(transformed_goal_pose));
-        } catch (tf2::TransformException& ex) {
-            RCLCPP_WARN(this->get_logger(), "Could not transform goal_pose: %s", ex.what());
-        }
-    }
-
     // Checking if a point is inside a polygon
     bool point_in_polygon(Point point, const std::vector<Point>& polygon) {
         int num_vertices = polygon.size();
@@ -625,9 +743,12 @@ private:
     rclcpp::TimerBase::SharedPtr timer_;
     double x_c, y_c, yaw_c;
     double x_global_frame, y_global_frame, yaw_global_frame;
+    double initial_x, initial_y, initial_yaw;
+    bool first_plane_created, returning_to_initial_position_; 
     std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
     tf2_ros::TransformListener tf_listener_;
     bool goal_reached_, received_microphone_heading, exploration_called, first_goal_received;
+    bool returned_back;
     rclcpp::Time last_heading_time_;
     rclcpp::Time latest_odom_time_;
     std::vector<double> available_headings_;
