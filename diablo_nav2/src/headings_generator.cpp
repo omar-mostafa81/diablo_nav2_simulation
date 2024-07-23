@@ -229,6 +229,12 @@ private:
             double angle1 = *it;
             double angle2 = *next_it;
 
+            //Special Case: when only 1 pcl found, angle2 = angle1, so diff = 0!
+            if (it == next_it) {
+                //add arbitrary angle 
+                angle2 = angle1 + 0.1;
+            }
+
             // double diff = atan2(sin(angle2 - angle1), cos(angle2 - angle1));
             // double range = abs(diff);
             //double diff = abs(angle2) - abs(angle1);
@@ -293,14 +299,16 @@ private:
                         second_heading += 2 * M_PI;
                     }
 
-                    if (!isAngleClose(first_heading, available_headings, degree_tolerance)) {
-                        available_headings.push_back(first_heading);
-                        ranges.push_back(diff/2);
-                    }
-                    if (!isAngleClose(second_heading, available_headings, degree_tolerance)) {
-                        available_headings.push_back(second_heading);
-                        ranges.push_back(diff/2);
-                    }
+                    //if (available_headings.size() == 1) {
+                        // if (!isAngleClose(first_heading, available_headings, degree_tolerance)) {
+                        //     available_headings.push_back(first_heading);
+                        //     ranges.push_back(diff/2);
+                        // }
+                        // if (!isAngleClose(second_heading, available_headings, degree_tolerance)) {
+                        //     available_headings.push_back(second_heading);
+                        //     ranges.push_back(diff/2);
+                        // }
+                    //}
 
                     // Add additional headings if the new range is greater than 54 degrees
                     if (abs(diff/2) > min_angle*2) {
@@ -354,26 +362,26 @@ private:
                             sixth_heading += 2 * M_PI;
                         }
 
-                        std::cout << angle1 << "," << angle2 << "," << middle_angle << "," << first_heading << "," << second_heading << "," 
-                                  << third_heading << "," << fourth_heading << "," << fifth_heading << "," << sixth_heading << "."
-                                  << std::endl;
+                        // std::cout << angle1 << "," << angle2 << "," << middle_angle << "," << first_heading << "," << second_heading << "," 
+                        //           << third_heading << "," << fourth_heading << "," << fifth_heading << "," << sixth_heading << "."
+                        //           << std::endl;
 
-                        if (!isAngleClose(third_heading, available_headings, degree_tolerance)) {
-                            available_headings.push_back(third_heading);
-                            ranges.push_back(diff/4);
-                        }
-                        if (!isAngleClose(fourth_heading, available_headings, degree_tolerance)) {
-                            available_headings.push_back(fourth_heading);
-                            ranges.push_back(diff/4);
-                        }
-                        if (!isAngleClose(fifth_heading, available_headings, degree_tolerance)) {
-                            available_headings.push_back(fifth_heading);
-                            ranges.push_back(diff/4);
-                        }
-                        if (!isAngleClose(sixth_heading, available_headings, degree_tolerance)) {
-                            available_headings.push_back(sixth_heading);
-                            ranges.push_back(diff/4);
-                        }
+                        // if (!isAngleClose(third_heading, available_headings, degree_tolerance)) {
+                        //     available_headings.push_back(third_heading);
+                        //     ranges.push_back(diff/4);
+                        // }
+                        // if (!isAngleClose(fourth_heading, available_headings, degree_tolerance)) {
+                        //     available_headings.push_back(fourth_heading);
+                        //     ranges.push_back(diff/4);
+                        // }
+                        // if (!isAngleClose(fifth_heading, available_headings, degree_tolerance)) {
+                        //     available_headings.push_back(fifth_heading);
+                        //     ranges.push_back(diff/4);
+                        // }
+                        // if (!isAngleClose(sixth_heading, available_headings, degree_tolerance)) {
+                        //     available_headings.push_back(sixth_heading);
+                        //     ranges.push_back(diff/4);
+                        // }
                         
                     }
                    
@@ -383,24 +391,25 @@ private:
 
         //If no obstacles detected but there are pcl2 detected, publish the main 4 directions as available headings
         //If no pcl2 are detected, make the robot rotate for 2 seconds
-        if (!no_pcl && no_obstacles) {
-            double angle1 = 0.0;
-            double angle2 = M_PI;
-            double angle3 = -M_PI/2;
-            double angle4 = M_PI/2; 
-            available_headings.push_back(angle1);
+        if ((!no_pcl && no_obstacles) || (available_headings.empty() && no_obstacles)) {
+            available_headings.push_back(0.0);
             //Make it prefer moving forward, then backward, then to the right, then to the left
             ranges.push_back(M_PI*2);
-            available_headings.push_back(angle2);
-            ranges.push_back(M_PI/2);
-            available_headings.push_back(angle3);
-            ranges.push_back(M_PI/2);
-            available_headings.push_back(angle4);
+            available_headings.push_back(M_PI);
             ranges.push_back(M_PI);
+            available_headings.push_back(-M_PI/2);
+            ranges.push_back(M_PI/2);
+            available_headings.push_back(M_PI/2);
+            ranges.push_back(M_PI/2);
         } else if (no_pcl && no_obstacles) {
             //rotate 45 degrees to update the octomap and start getting pointclouds
-            //rotate_to(M_PI/4);
+            rotate_to(M_PI/8);
         }
+
+        // Debugging logs
+        RCLCPP_WARN(this->get_logger(), "no_pcl: %d, no_obstacles: %d", no_pcl, no_obstacles);
+        RCLCPP_WARN(this->get_logger(), "Available headings size: %zu", available_headings.size());
+
         // Close the file
         angle_file.close();
         //Publish the available headings

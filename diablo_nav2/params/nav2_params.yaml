@@ -168,26 +168,29 @@
         vy_samples: 15
         vtheta_samples: 40
         sim_time: 3.0
-        #linear_granularity: 0.05
-        #angular_granularity: 0.025
+        linear_granularity: 0.05
+        angular_granularity: 0.025
         transform_tolerance: 0.2
-        xy_goal_tolerance: 0.25
+        xy_goal_tolerance: 0.15
         trans_stopped_velocity: 0.05
         #short_circuit_trajectory_evaluation: True
         stateful: True
         critics: ["RotateToGoal", "Oscillation", "BaseObstacle", "GoalAlign", "PathAlign", "PathDist", "GoalDist", "PreferForward"]
-        BaseObstacle.scale: 0.02
-        PathAlign.scale: 32.0
+        BaseObstacle.scale: 40.0
+        BaseObstacle.sum_scores: true
+        ObstacleFootprint.scale: 60.0
+        ObstacleFootprint.sum_scores: true
+        PathAlign.scale: 40.0
         PathAlign.forward_point_distance: 0.1
+        PathAligh.aggregation_type: "sum"
         GoalAlign.scale: 24.0
         GoalAlign.forward_point_distance: 0.1
         PathDist.scale: 32.0
+        PathDist.aggregation_type: "sum"
         GoalDist.scale: 24.0
         RotateToGoal.scale: 32.0
         RotateToGoal.slowing_factor: 0.0
         RotateToGoal.lookahead_time: 1.0
-        ObstacleFootprint.scale: 0.01
-        ObstacleFootprint.sum_scores: true
         PreferForward.theta_scale: 0.01
         PreferForward.strafe_x: 0.3
       # FollowPath:
@@ -288,14 +291,14 @@
         width: 3
         height: 3
         resolution: 0.05
-        robot_radius: 0.35
-        plugins: ["voxel_layer", "inflation_layer"]
+        robot_radius: 0.22
+        plugins: ["voxel_layer", "inflation_layer", "denoise_layer", "obstacle_layer"]
         #plugins: ["obstacle_layer", "inflation_layer", "voxel_layer"]
         inflation_layer:
           plugin: "nav2_costmap_2d::InflationLayer"
           enabled: True
-          cost_scaling_factor: 3.0
-          inflation_radius: 0.40
+          cost_scaling_factor: 20.0
+          inflation_radius: 0.30
         voxel_layer:
           plugin: "nav2_costmap_2d::VoxelLayer"
           enabled: True
@@ -310,6 +313,7 @@
           observation_sources: "pointcloud"
           pointcloud:
             topic: "/velodyne_points"
+            sensor_frame: lidar_link
             max_obstacle_height: 1.0
             min_obstacle_height: 0.2
             clearing: True
@@ -319,25 +323,31 @@
             raytrace_min_range: 0.0
             obstacle_max_range: 2.5
             obstacle_min_range: 0.0
-        # obstacle_layer:
-        #   plugin: "nav2_costmap_2d::ObstacleLayer"
-        #   enabled: False
-        #   observation_sources: "pointcloud"
-        #   pointcloud:
-        #     topic: /velodyne_points
-        #     max_obstacle_height: 1.0
-        #     clearing: True
-        #     marking: True
-        #     data_type: "PointCloud2"
-        #     raytrace_max_range: 3.0
-        #     raytrace_min_range: 0.0
-        #     obstacle_max_range: 2.5
-        #     obstacle_min_range: 0.0
+        obstacle_layer:
+          plugin: "nav2_costmap_2d::ObstacleLayer"
+          enabled: True
+          observation_sources: "pointcloud"
+          pointcloud:
+            topic: "/velodyne_points"
+            sensor_frame: lidar_link
+            max_obstacle_height: 1.0
+            clearing: True
+            marking: True
+            data_type: "PointCloud2"
+            raytrace_max_range: 3.0
+            raytrace_min_range: 0.0
+            obstacle_max_range: 2.5
+            obstacle_min_range: 0.0
         static_layer:
           plugin: "nav2_costmap_2d::StaticLayer"
           map_subscribe_transient_local: True
-          #subscribe_to_updates: True
-          #map_topic: "/map"
+          subscribe_to_updates: True
+          map_topic: "/map"
+        denoise_layer:
+          plugin: "nav2_costmap_2d::DenoiseLayer"
+          enabled: True
+          minimal_group_size: 2
+          group_connectivity_type: 8
         always_send_full_costmap: True
 
   global_costmap:
@@ -347,21 +357,21 @@
         publish_frequency: 2.0
         global_frame: "map"
         robot_base_frame: "base_link"
-        robot_radius: 0.35
+        robot_radius: 0.22
         resolution: 0.05
         use_sim_time: True
         track_unknown_space: true
         always_send_full_costmap: True
         #map_topic: "/map"
         #plugins: ["static_layer", "obstacle_layer", "inflation_layer", "voxel_layer"]
-        plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
+        plugins: ["static_layer", "obstacle_layer", "inflation_layer", "denoise_layer", "voxel_layer"]
         obstacle_layer:
           plugin: "nav2_costmap_2d::ObstacleLayer"
           enabled: True
           observation_sources: "pointcloud"
           #combination_method: 0
           pointcloud:
-            topic: /velodyne_points
+            topic: "/velodyne_points"
             sensor_frame: lidar_link
             max_obstacle_height: 2.0
             min_obstacle_height: 0.2
@@ -372,37 +382,44 @@
             raytrace_min_range: 0.0
             obstacle_max_range: 2.5
             obstacle_min_range: 0.0
-        # voxel_layer:
-        #   plugin: "nav2_costmap_2d::VoxelLayer"
-        #   enabled: True
-        #   publish_voxel_map: True
-        #   origin_z: -0.26
-        #   z_resolution: 0.05
-        #   z_voxels: 16
-        #   max_obstacle_height: 1.0
-        #   mark_threshold: 0
-        #   observation_sources: "pointcloud"
-        #   combination_method: 0
-        #   pointcloud:
-        #     topic: "/velodyne_points"
-        #     max_obstacle_height: 1.0
-        #     min_obstacle_height: 0.2
-        #     clearing: True
-        #     marking: True
-        #     data_type: "PointCloud2"
-        #     raytrace_max_range: 20.0
-        #     raytrace_min_range: 0.0
-        #     obstacle_max_range: 20.0
-        #     obstacle_min_range: 0.0
+        voxel_layer:
+          plugin: "nav2_costmap_2d::VoxelLayer"
+          enabled: True
+          publish_voxel_map: True
+          #origin_x: -1.5
+          #origin_y: -1.5
+          origin_z: 0.0
+          z_resolution: 0.05
+          z_voxels: 16
+          max_obstacle_height: 2.0
+          mark_threshold: 0
+          observation_sources: "pointcloud"
+          pointcloud:
+            topic: "/velodyne_points"
+            sensor_frame: lidar_link
+            max_obstacle_height: 1.0
+            min_obstacle_height: 0.2
+            clearing: True
+            marking: True
+            data_type: "PointCloud2"
+            raytrace_max_range: 3.0
+            raytrace_min_range: 0.0
+            obstacle_max_range: 2.5
+            obstacle_min_range: 0.0
         static_layer:
           plugin: "nav2_costmap_2d::StaticLayer"
           map_subscribe_transient_local: True
-          #subscribe_to_updates: True
-          #map_topic: "/map"
+          subscribe_to_updates: True
+          map_topic: "/map"
         inflation_layer:
           plugin: "nav2_costmap_2d::InflationLayer"
-          cost_scaling_factor: 3.0
-          inflation_radius: 0.55
+          cost_scaling_factor: 4.0
+          inflation_radius: 5.55
+        denoise_layer:
+          plugin: "nav2_costmap_2d::DenoiseLayer"
+          enabled: true
+          minimal_group_size: 2
+          group_connectivity_type: 8
 
   map_saver:
     ros__parameters:
@@ -516,7 +533,15 @@
       source_timeout: 1.0
       base_shift_correction: True
       stop_pub_timeout: 2.0
-      polygons: ["FootprintApproach"]
+      polygons: ["FootprintApproach", "PolygonStop"]
+      PolygonStop:
+        type: "circle"
+        radius: 0.2
+        action_type: "stop"
+        min_points: 3  # max_points: 3 for Humble
+        visualize: True
+        polygon_pub_topic: "polygon_stop"
+        enabled: True
       FootprintApproach:
         type: "polygon"
         action_type: "approach"
@@ -530,6 +555,7 @@
       pointcloud:
         type: "pointcloud"
         topic: "/velodyne_points"
+        sensor_frame: lidar_link
         min_height: 0.2
         max_height: 1.0
         enabled: True

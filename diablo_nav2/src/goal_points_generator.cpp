@@ -17,6 +17,7 @@
 #include <filesystem>
 #include <sstream>
 #include <deque>
+#include <unordered_set>
 #include <algorithm>
 #include <tf2_ros/transform_listener.h>
 #include <tf2_ros/buffer.h>
@@ -87,6 +88,31 @@ struct Halfplane {
     }
 };
 
+// Define a struct for the waypoint and its yaw
+struct Waypoint {
+    double x;
+    double y;
+    double yaw;
+
+    bool operator==(const Waypoint &other) const {
+        return std::fabs(x - other.x) < 0.1 &&
+               std::fabs(y - other.y) < 0.1 &&
+               std::fabs(yaw - other.yaw) < 0.1;
+    }
+};
+
+// Define a hash function for Waypoint
+namespace std {
+    template<>
+    struct hash<Waypoint> {
+        size_t operator()(const Waypoint &wp) const {
+            return std::hash<double>()(wp.x) ^
+                   std::hash<double>()(wp.y) ^
+                   std::hash<double>()(wp.yaw);
+        }
+    };
+}
+
 class GoalPointsGenerator : public rclcpp::Node
 {
 public: 
@@ -98,7 +124,8 @@ public:
                             received_microphone_heading(false),
                             exploration_called(false),
                             first_goal_received(false),
-                            last_heading_time_(this->now())
+                            last_heading_time_(this->now()),
+                            last_rotation_time(this->now())
         {
         // Create a subscriber to the "headings" topic from the microphone
         headings_subscriber = this->create_subscription<std_msgs::msg::Float64>(
@@ -127,9 +154,16 @@ public:
         navigate_to_pose_client_ = rclcpp_action::create_client<NavigateToPose>(this, "navigate_to_pose");
         first_plane_created = false;
         returning_to_initial_position_ = false;
+        rotating180degrees = false; rotating = false;
         initial_x = 0.0; initial_y = 0.0; initial_yaw = 0.0;
         returned_back = false;
         exploration_step = 0; // Reset exploration step
+
+        // Initialize the waypoints set
+        visited_waypoints_ = std::make_shared<std::unordered_set<Waypoint>>();
+        // Save the odometry data as a waypoint
+        Waypoint current_waypoint = {x_global_frame, y_global_frame, yaw_global_frame};
+        visited_waypoints_->insert(current_waypoint);
 
     }
 
@@ -166,6 +200,10 @@ private:
         double cosy_cosp1 = 1.0 - 2.0 * (quat_y1 * quat_y1 + quat_z1 * quat_z1);
         yaw_global_frame = atan2(siny_cosp1, cosy_cosp1);
 
+        // Save the odometry data as a waypoint
+        Waypoint current_waypoint = {x_global_frame, y_global_frame, yaw_global_frame};
+        visited_waypoints_->insert(current_waypoint);
+
         geometry_msgs::msg::PoseStamped pose_in, pose_out;
         pose_in.pose = msg->pose.pose;
         pose_in.header = msg->header;
@@ -190,8 +228,6 @@ private:
         double siny_cosp = 2.0 * (quat_w * quat_z + quat_x * quat_y);
         double cosy_cosp = 1.0 - 2.0 * (quat_y * quat_y + quat_z * quat_z);
         yaw_c = atan2(siny_cosp, cosy_cosp);
-
-        //std::cout << "yaw map frame: " << yaw_global_frame << ", yaw lidar frame: " << yaw_c << std::endl;
     }
 
     void availableHeadingsCallback(const std_msgs::msg::Float64MultiArray::SharedPtr msg)
@@ -206,7 +242,6 @@ private:
             received_microphone_heading = true;
             // Heading is an angle between -pi to pi (in radians)
             double heading = static_cast<double>(msg->data);
-
             moveTowardsHeading(heading);
             received_microphone_heading = false;
         } else {
@@ -306,9 +341,9 @@ private:
             case rclcpp_action::ResultCode::SUCCEEDED:
                 RCLCPP_INFO(this->get_logger(), "Goal was reached");
                 goal_reached_ = true;
-                if (returning_to_initial_position_) {
-                    returning_to_initial_position_ = false;
-                    resetOrientationAndExplore();
+                if (rotating) {
+                    rotating = false;
+                    Reset_Exploration_Direction(99999);
                 }
                 break;
             case rclcpp_action::ResultCode::ABORTED:
@@ -415,69 +450,128 @@ private:
             if (!intersection.empty()) {
                 double best_heading;
                 bool heading_found = false;
+                bool atleast1_valid_heading = false;
                 double min_angle_diff = std::numeric_limits<double>::max();
 
-                // for (const auto& heading : available_headings_) {
-                //     double angle_diff = heading + yaw_global_frame;
-                //     // Normalize the angle to be within pi to -pi
-                //     if (angle_diff > M_PI) {
-                //         angle_diff -= 2 * M_PI;
-                //     } else if (angle_diff < -M_PI) {
-                //         angle_diff += 2 * M_PI;
-                //     }
-                //     Point goal_position(
-                //         x_global_frame + cos(angle_diff),
-                //         y_global_frame + sin(angle_diff)
-                //     );
-
-                //     std::cout << "Goal point is (" << goal_position.x << "," << goal_position.y << "), for the heading: " << heading << std::endl;
-
-                //     if (point_in_polygon(goal_position, intersection)) {
-                //         best_heading = heading;
-                //         heading_found = true;
-                //         break;
-                //     }
-                // }
-
                 for (const auto& heading : available_headings_) {
-                    double heading_global_frame = heading + yaw_global_frame;
-                    // Normalize the angle to be within pi to -pi
-                    if (heading_global_frame > M_PI) {
-                        heading_global_frame -= 2 * M_PI;
-                    } else if (heading_global_frame < -M_PI) {
-                        heading_global_frame += 2 * M_PI;
-                    }
-
-                    double initial_yaw_InCurrentStep = initial_yaw + exploration_step * M_PI / 2;
-                    // Normalize the angle to be within pi to -pi
-                    if (initial_yaw_InCurrentStep > M_PI) {
-                        initial_yaw_InCurrentStep -= 2 * M_PI;
-                    } else if (initial_yaw_InCurrentStep < -M_PI) {
-                        initial_yaw_InCurrentStep += 2 * M_PI;
-                    }
-
-                    //double angle_diff = std::abs(heading_global_frame - initial_yaw_InCurrentStep);
-                    double angle_diff = abs(atan2(sin(heading_global_frame - initial_yaw_InCurrentStep), cos(heading_global_frame - initial_yaw_InCurrentStep)));
+                    double angle_diff = heading + yaw_global_frame;
                     // Normalize the angle to be within pi to -pi
                     if (angle_diff > M_PI) {
                         angle_diff -= 2 * M_PI;
                     } else if (angle_diff < -M_PI) {
                         angle_diff += 2 * M_PI;
                     }
-                                        
                     Point goal_position(
-                        x_global_frame + cos(heading_global_frame),
-                        y_global_frame + sin(heading_global_frame)
+                        x_global_frame + cos(angle_diff),
+                        y_global_frame + sin(angle_diff)
                     );
 
                     std::cout << "Goal point is (" << goal_position.x << "," << goal_position.y << "), for the heading: " << heading << std::endl;
-                    std::cout << "Its angle diff is: " << angle_diff << std::endl;
-                    if (point_in_polygon(goal_position, intersection) && angle_diff < min_angle_diff) {
-                        best_heading = heading;
-                        min_angle_diff = angle_diff;
-                        heading_found = true;
+
+                    if (point_in_polygon(goal_position, intersection)) {
+                        atleast1_valid_heading = true;
+                        // Check if this goal is near any visited waypoints
+                        bool near_visited_waypoint = false;
+                        for (const auto& wp : *visited_waypoints_) {
+                            if (std::fabs(goal_position.x - wp.x) < 0.2 && 
+                                std::fabs(goal_position.y - wp.y) < 0.2) {
+                                std::cout << "Goal point is near a visisted point, skipping it.." << std::endl;
+                                near_visited_waypoint = true;
+                                break;
+                            }
+                        }
+
+                        if (!near_visited_waypoint) {
+                            best_heading = heading;
+                            heading_found = true;
+                            break;
+                        }
+                        // best_heading = heading;
+                        // heading_found = true;
+                        // break;
+                    } 
+                }
+
+                if (!heading_found && atleast1_valid_heading) {
+                    for (const auto& heading : available_headings_) {
+                        double angle_diff = heading + yaw_global_frame;
+                        // Normalize the angle to be within pi to -pi
+                        if (angle_diff > M_PI) {
+                            angle_diff -= 2 * M_PI;
+                        } else if (angle_diff < -M_PI) {
+                            angle_diff += 2 * M_PI;
+                        }
+                        Point goal_position(
+                            x_global_frame + cos(angle_diff),
+                            y_global_frame + sin(angle_diff)
+                        );
+
+                        std::cout << "Goal point is (" << goal_position.x << "," << goal_position.y << "), for the heading: " << heading << std::endl;
+
+                        if (point_in_polygon(goal_position, intersection)) {
+
+                            // Find the heading that results in a different yaw degree
+                            for (const auto& wp : *visited_waypoints_) {
+                                double diff_yaw = atan2(sin(angle_diff - wp.yaw), cos(angle_diff - wp.yaw));
+                                double opposite_yaw = atan2(sin(angle_diff - (wp.yaw + M_PI)), cos(angle_diff - (wp.yaw + M_PI)));
+
+                                if ((std::fabs(diff_yaw) > (20 * M_PI / 180) || std::fabs(opposite_yaw) > (20 * M_PI / 180)) &&
+                                    std::fabs(goal_position.x - wp.x) < 0.2 && 
+                                    std::fabs(goal_position.y - wp.y) < 0.2) {
+                                    std::cout << "Goal point is near a visisted point, but with different yaw degree. Goal Selected." << std::endl;
+                                    best_heading = heading;
+                                    heading_found = true;
+                                    break;
+                                }
+                            }
+
+                            // best_heading = heading;
+                            // heading_found = true;
+                            // break;
+                        }
+                        if (heading_found) break;
                     }
                 }
+
+                // for (const auto& heading : available_headings_) {
+                //     double heading_global_frame = heading + yaw_global_frame;
+                //     // Normalize the angle to be within pi to -pi
+                //     if (heading_global_frame > M_PI) {
+                //         heading_global_frame -= 2 * M_PI;
+                //     } else if (heading_global_frame < -M_PI) {
+                //         heading_global_frame += 2 * M_PI;
+                //     }
+
+                //     double initial_yaw_InCurrentStep = initial_yaw + exploration_step * M_PI / 2;
+                //     // Normalize the angle to be within pi to -pi
+                //     if (initial_yaw_InCurrentStep > M_PI) {
+                //         initial_yaw_InCurrentStep -= 2 * M_PI;
+                //     } else if (initial_yaw_InCurrentStep < -M_PI) {
+                //         initial_yaw_InCurrentStep += 2 * M_PI;
+                //     }
+
+                //     //double angle_diff = std::abs(heading_global_frame - initial_yaw_InCurrentStep);
+                //     double angle_diff = abs(atan2(sin(heading_global_frame - initial_yaw_InCurrentStep), cos(heading_global_frame - initial_yaw_InCurrentStep)));
+                //     // Normalize the angle to be within pi to -pi
+                //     if (angle_diff > M_PI) {
+                //         angle_diff -= 2 * M_PI;
+                //     } else if (angle_diff < -M_PI) {
+                //         angle_diff += 2 * M_PI;
+                //     }
+                                        
+                //     Point goal_position(
+                //         x_global_frame + cos(heading_global_frame),
+                //         y_global_frame + sin(heading_global_frame)
+                //     );
+
+                //     std::cout << "Goal point is (" << goal_position.x << "," << goal_position.y << "), for the heading: " << heading << std::endl;
+                //     std::cout << "Its angle diff is: " << angle_diff << std::endl;
+                //     if (point_in_polygon(goal_position, intersection) && angle_diff < min_angle_diff) {
+                //         best_heading = heading;
+                //         min_angle_diff = angle_diff;
+                //         heading_found = true;
+                //     }
+                // }
 
                 if (heading_found) {
                     moveTowardsHeading(best_heading);
@@ -488,95 +582,246 @@ private:
                 }
             } 
 
-             //Allow to return back only once or forward in the current semi plane only once
-            if (returned_back) {
-                RCLCPP_WARN(this->get_logger(), "Resetting position and Orientation.");
-                returning_to_initial_position_ = true;
-                resetOrientationAndExplore();
-                returned_back = false;
-                return;
-            }
+            //  //Allow to return back only once or forward in the current semi plane only once
+            // if (returned_back) {
+            //     RCLCPP_WARN(this->get_logger(), "Resetting position and Orientation.");
+            //     returning_to_initial_position_ = true;
+            //     resetOrientationAndExplore();
+            //     returned_back = false;
+            //     return;
+            // }
 
             // If no intersection, consider only the current semi-plane
-            for (const auto& heading : available_headings_) {
-                if (isWithinSemiPlane(heading, forward_center, half_plane_range)) {
-                    moveTowardsHeading(heading);
-                    //change name later
-                    returned_back = true;
-                    RCLCPP_INFO(this->get_logger(), "The heading %f was found at the current FORWARD semi-plane.", heading);
-                    return;
-                } 
-            }
+            // for (const auto& heading : available_headings_) {
+            //     if (isWithinSemiPlane(heading, forward_center, half_plane_range)) {
+            //         moveTowardsHeading(heading);
+            //         //change name later
+            //         returned_back = true;
+            //         RCLCPP_INFO(this->get_logger(), "The heading %f was found at the current FORWARD semi-plane.", heading);
+            //         return;
+            //     } 
+            // }
 
             // If no available headings in the current semi-plane, consider the backward semi-plane
-            for (const auto& heading : available_headings_) {
-                if (isWithinSemiPlane(heading, backward_center, half_plane_range)) {
-                    moveTowardsHeading(heading);
-                    returned_back = true;
-                     RCLCPP_INFO(this->get_logger(), "The heading %f was found at the current BACKWARD semi-plane.", heading);
-                    return;
-                } 
-            }
+            // for (const auto& heading : available_headings_) {
+            //     if (isWithinSemiPlane(heading, backward_center, half_plane_range)) {
+            //         moveTowardsHeading(heading);
+            //         returned_back = true;
+            //          RCLCPP_INFO(this->get_logger(), "The heading %f was found at the current BACKWARD semi-plane.", heading);
+            //         return;
+            //     } 
+            // }
 
-            RCLCPP_WARN(this->get_logger(), "No available headings found in any semi-plane.");
-            //return;
+            // RCLCPP_WARN(this->get_logger(), "Rotating 180 degrees and resuming exploration.");
+            // rotating180degrees = true;
+            // resetOrientationAndExplore();
+            // last_rotation_time = this->now();
+
+            //Find the heading that is available and will cause the visit of unvisited cell
+            RCLCPP_WARN(this->get_logger(), "Finding the new exploration direction.");
+            double exploration_direction;
+            bool exploration_dir_found = false;
+            for (const auto& heading : available_headings_) {
+                double angle_diff = heading + yaw_global_frame;
+                // Normalize the angle to be within pi to -pi
+                if (angle_diff > M_PI) {
+                    angle_diff -= 2 * M_PI;
+                } else if (angle_diff < -M_PI) {
+                    angle_diff += 2 * M_PI;
+                }
+                Point goal_position(
+                    x_global_frame + cos(angle_diff),
+                    y_global_frame + sin(angle_diff)
+                );
+
+                // Check if this goal is near any visited waypoints
+                bool near_visited_waypoint = false;
+                for (const auto& wp : *visited_waypoints_) {
+                    if (std::fabs(goal_position.x - wp.x) < 0.2 && 
+                        std::fabs(goal_position.y - wp.y) < 0.2) {
+                        near_visited_waypoint = true;
+                        break;
+                    }
+                }
+
+                if (!near_visited_waypoint) {
+                    exploration_direction = heading;
+                    exploration_dir_found = true;
+                    break;
+                } 
+
+            }
+            
+            //Perform the rotation and reset the explored planes
+            if (exploration_dir_found) {
+                RCLCPP_WARN(this->get_logger(), "The new exploration direction is: %f", exploration_direction);
+                rotating = true;
+                Reset_Exploration_Direction(exploration_direction);
+            } else {
+                //Make it rotate 180 degrees, regardless 
+                RCLCPP_WARN(this->get_logger(), "No new exploration direction found. Rotating 180 degrees");
+                rotating = true;
+                Reset_Exploration_Direction(M_PI);
+            }
+        
+            return;
         }
     }
 
+    // void resetOrientationAndExplore()
+    // {
+    //     if (returning_to_initial_position_) {
+    //         RCLCPP_INFO(this->get_logger(), "Returning to initial position and resetting orientation.");
+    //         returnToInitialPosition();
+    //     } else {
+    //         // Reset the flag 
+    //         goal_reached_ = false;
+    //         // Clear all the half-planes from the vector
+    //         halfplanes.clear();
+    //         // Restart the exploration process and stop if done
+    //         if (exploration_step <= 3) {
+    //             exploration_called = true;
+    //             startExploration();
+    //         }
+    //     }
+    // }
+
     void resetOrientationAndExplore()
     {
-        if (returning_to_initial_position_) {
-            RCLCPP_INFO(this->get_logger(), "Returning to initial position and resetting orientation.");
-            returnToInitialPosition();
+        if (rotating180degrees) {
+            RCLCPP_INFO(this->get_logger(), "Rotating 180 degrees...");
+            rotate180degrees();
         } else {
             // Reset the flag 
             goal_reached_ = false;
             // Clear all the half-planes from the vector
             halfplanes.clear();
-            // Restart the exploration process and stop if done
-            if (exploration_step <= 3) {
-                exploration_called = true;
-                startExploration();
-            }
+            // Restart the exploration process (will add the terminator later)
+            exploration_called = true;
+            startExploration();
         }
     }
 
-    void returnToInitialPosition()
+    void Reset_Exploration_Direction(double direction)
     {
-        //Change the initial orientation based on the exploration step
-        exploration_step++;
-        if (exploration_step > 3) {
-            //Stop the Exploration process
-            std::cout << "Exploration process has ended." << std::endl;
+        if (rotating) {
+            RCLCPP_INFO(this->get_logger(), "Rotating towards %f", direction);
+            rotateToHeading(direction);
+        } else {
+            // Reset the flag 
+            goal_reached_ = false;
+            // Clear all the half-planes from the vector
+            halfplanes.clear();
+            // Restart the exploration process (will add the terminator later)
+            exploration_called = true;
+            startExploration();
         }
+    }
 
-        double new_orientation = initial_yaw + exploration_step * M_PI / 2;
+    void rotateToHeading(double heading)
+    {
+        //new orientation is current + heading
+        double new_orientation = yaw_global_frame + heading;
+        std::cout << "New orientation is: " << new_orientation << std::endl;
+
         if (new_orientation > M_PI) {
             new_orientation -= 2 * M_PI;
         } else if (new_orientation < -M_PI) {
             new_orientation += 2 * M_PI;
         }
         // Create the goal pose for the initial position
-        geometry_msgs::msg::PoseStamped initial_goal_pose;
-        initial_goal_pose.header.stamp = latest_odom_time_;
-        initial_goal_pose.header.frame_id = "map";  
+        geometry_msgs::msg::PoseStamped rotate_goal_pose;
+        rotate_goal_pose.header.stamp = latest_odom_time_;
+        rotate_goal_pose.header.frame_id = "map";  
 
-        initial_goal_pose.pose.position.x = initial_x;
-        initial_goal_pose.pose.position.y = initial_y;
-        initial_goal_pose.pose.position.z = 0.0;
+        //keep the current position
+        rotate_goal_pose.pose.position.x = x_global_frame;
+        rotate_goal_pose.pose.position.y = y_global_frame;
+        rotate_goal_pose.pose.position.z = 0.0;
 
         // Set the initial orientation
         tf2::Quaternion q;
         q.setRPY(0, 0, new_orientation);
-        initial_goal_pose.pose.orientation = tf2::toMsg(q);
+        rotate_goal_pose.pose.orientation = tf2::toMsg(q);
 
         // Publish the initial goal pose
-        sendGoal(std::make_shared<geometry_msgs::msg::PoseStamped>(initial_goal_pose));
+        sendGoal(std::make_shared<geometry_msgs::msg::PoseStamped>(rotate_goal_pose));
 
-        // Set a flag to indicate that the robot is returning to the initial position
+        // Set a flag to indicate that the robot is rotating
         exploration_called = false;
-        returning_to_initial_position_ = true;
+        rotating = true;
     }
+
+    void rotate180degrees()
+    {
+        //new orientation is current + 180
+        double new_orientation = yaw_global_frame + M_PI;
+        std::cout << "New orientation is: " << new_orientation << std::endl;
+
+        if (new_orientation > M_PI) {
+            new_orientation -= 2 * M_PI;
+        } else if (new_orientation < -M_PI) {
+            new_orientation += 2 * M_PI;
+        }
+        // Create the goal pose for the initial position
+        geometry_msgs::msg::PoseStamped rotate_goal_pose;
+        rotate_goal_pose.header.stamp = latest_odom_time_;
+        rotate_goal_pose.header.frame_id = "map";  
+
+        //keep the current position
+        rotate_goal_pose.pose.position.x = x_global_frame;
+        rotate_goal_pose.pose.position.y = y_global_frame;
+        rotate_goal_pose.pose.position.z = 0.0;
+
+        // Set the initial orientation
+        tf2::Quaternion q;
+        q.setRPY(0, 0, new_orientation);
+        rotate_goal_pose.pose.orientation = tf2::toMsg(q);
+
+        // Publish the initial goal pose
+        sendGoal(std::make_shared<geometry_msgs::msg::PoseStamped>(rotate_goal_pose));
+
+        // Set a flag to indicate that the robot is rotating
+        exploration_called = false;
+        rotating180degrees = true;
+    }
+
+    // void returnToInitialPosition()
+    // {
+    //     //Change the initial orientation based on the exploration step
+    //     exploration_step++;
+    //     if (exploration_step > 3) {
+    //         //Stop the Exploration process
+    //         std::cout << "Exploration process has ended." << std::endl;
+    //     }
+
+    //     double new_orientation = initial_yaw + exploration_step * M_PI / 2;
+    //     if (new_orientation > M_PI) {
+    //         new_orientation -= 2 * M_PI;
+    //     } else if (new_orientation < -M_PI) {
+    //         new_orientation += 2 * M_PI;
+    //     }
+    //     // Create the goal pose for the initial position
+    //     geometry_msgs::msg::PoseStamped initial_goal_pose;
+    //     initial_goal_pose.header.stamp = latest_odom_time_;
+    //     initial_goal_pose.header.frame_id = "map";  
+
+    //     initial_goal_pose.pose.position.x = initial_x;
+    //     initial_goal_pose.pose.position.y = initial_y;
+    //     initial_goal_pose.pose.position.z = 0.0;
+
+    //     // Set the initial orientation
+    //     tf2::Quaternion q;
+    //     q.setRPY(0, 0, new_orientation);
+    //     initial_goal_pose.pose.orientation = tf2::toMsg(q);
+
+    //     // Publish the initial goal pose
+    //     sendGoal(std::make_shared<geometry_msgs::msg::PoseStamped>(initial_goal_pose));
+
+    //     // Set a flag to indicate that the robot is returning to the initial position
+    //     exploration_called = false;
+    //     returning_to_initial_position_ = true;
+    // }
 
     void moveTowardsHeading(double heading)
     {
@@ -744,16 +989,20 @@ private:
     double x_c, y_c, yaw_c;
     double x_global_frame, y_global_frame, yaw_global_frame;
     double initial_x, initial_y, initial_yaw;
-    bool first_plane_created, returning_to_initial_position_; 
+    bool first_plane_created, returning_to_initial_position_, rotating180degrees, rotating; 
     std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
     tf2_ros::TransformListener tf_listener_;
     bool goal_reached_, received_microphone_heading, exploration_called, first_goal_received;
     bool returned_back;
     rclcpp::Time last_heading_time_;
     rclcpp::Time latest_odom_time_;
+    rclcpp::Time last_rotation_time;
     std::vector<double> available_headings_;
     std::vector<Halfplane> halfplanes;
     int exploration_step;
+
+    // Declare the waypoints container
+    std::shared_ptr<std::unordered_set<Waypoint>> visited_waypoints_;
 
 };
 

@@ -71,7 +71,7 @@ def generate_launch_description():
         "global_frame": "map",
         "odom_frame_id": "odom",
         "local_frame": "odom",
-        "topic": "/velodyne_points",
+        #"topic": "/velodyne_points",
         "default_nav_to_pose_bt_xml": PathJoinSubstitution(
             [
                 bringup_dir,
