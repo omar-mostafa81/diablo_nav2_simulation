@@ -22,7 +22,9 @@ def generate_launch_description():
     #export GAZEBO_MODEL_PATH=$GAZEBO_MODEL_PATH:/opt/ros/<ros2-distro>/share/turtlebot3_gazebo/models
     #after installing:
     #sudo apt install ros-<ros2-distro>-turtlebot3-gazebo
-    world_path=os.path.join(pkg_share, 'worlds/small_house.world')
+    #world_path=os.path.join(pkg_share, '/opt/ros/humble/share/turtlebot3_gazebo/worlds/turtlebot3_house.world')
+    world_path=os.path.join(pkg_share, 'world/F1-apartment.sdf')
+
     
     robot_state_publisher_node = launch_ros.actions.Node(
         package='robot_state_publisher',
@@ -55,7 +57,8 @@ def generate_launch_description():
         arguments=[
             '-entity', 'diablo', 
             '-topic', 'robot_description',
-            '-x', '0', '-y', '0', '-z', '0.2'
+            '-x', '-0.5', '-y', '7.0', '-z', '0.2'
+            , '-Y', '-1.57'
         ],
         output='screen'
     )
@@ -112,11 +115,11 @@ def generate_launch_description():
                                             description='Absolute path to rviz config file'),
         launch.actions.DeclareLaunchArgument(name='use_sim_time', default_value='True',
                                             description='Flag to enable use_sim_time'),
-        #launch.actions.ExecuteProcess(cmd=['gazebo', '--verbose', '-s', 'libgazebo_ros_init.so', '-s', 'libgazebo_ros_factory.so', world_path], output='screen'),
+        launch.actions.ExecuteProcess(cmd=['gazebo', '--verbose', '-s', 'libgazebo_ros_init.so', '-s', 'libgazebo_ros_factory.so', world_path], output='screen'),
         joint_state_publisher_node,
         robot_state_publisher_node,
         spawn_entity,
-        small_house,
+        #small_house,
         #rviz_node,
         rtabmap_slam
     ])

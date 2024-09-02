@@ -186,7 +186,7 @@ private:
         std::set<double> obstacle_angles; // Set to store unique obstacle angles
 
         // Open a file in write mode
-        std::ofstream angle_file("/home/nyukl/diablo_ws/src/diablo_nav2_simulation/diablo_nav2/src/angles.txt");
+        std::ofstream angle_file("/home/omar/Projects/diablo_ws/src/diablo_nav2_simulation/diablo_nav2/src/angles.txt");
         if (!angle_file.is_open()) {
             std::cerr << "Failed to open angles.txt for writing" << std::endl;
             return;
@@ -216,7 +216,7 @@ private:
         std::vector<double> available_headings;
         std::vector<double> ranges;
         const double degree_tolerance = 5.0 * M_PI / 180;  // 5 degrees in radians
-        double min_angle = 41 * M_PI / 180; 
+        double min_angle = 24 * M_PI / 180; 
 
         //for (auto it = obstacle_angles.begin(); it != std::prev(obstacle_angles.end()); ++it) {
         for (auto it = obstacle_angles.begin(); it != obstacle_angles.end(); ++it) {
@@ -300,14 +300,14 @@ private:
                     }
 
                     //if (available_headings.size() == 1) {
-                        // if (!isAngleClose(first_heading, available_headings, degree_tolerance)) {
-                        //     available_headings.push_back(first_heading);
-                        //     ranges.push_back(diff/2);
-                        // }
-                        // if (!isAngleClose(second_heading, available_headings, degree_tolerance)) {
-                        //     available_headings.push_back(second_heading);
-                        //     ranges.push_back(diff/2);
-                        // }
+                        if (!isAngleClose(first_heading, available_headings, degree_tolerance)) {
+                            available_headings.push_back(first_heading);
+                            ranges.push_back(diff/2);
+                        }
+                        if (!isAngleClose(second_heading, available_headings, degree_tolerance)) {
+                            available_headings.push_back(second_heading);
+                            ranges.push_back(diff/2);
+                        }
                     //}
 
                     // Add additional headings if the new range is greater than 54 degrees
@@ -366,22 +366,22 @@ private:
                         //           << third_heading << "," << fourth_heading << "," << fifth_heading << "," << sixth_heading << "."
                         //           << std::endl;
 
-                        // if (!isAngleClose(third_heading, available_headings, degree_tolerance)) {
-                        //     available_headings.push_back(third_heading);
-                        //     ranges.push_back(diff/4);
-                        // }
-                        // if (!isAngleClose(fourth_heading, available_headings, degree_tolerance)) {
-                        //     available_headings.push_back(fourth_heading);
-                        //     ranges.push_back(diff/4);
-                        // }
-                        // if (!isAngleClose(fifth_heading, available_headings, degree_tolerance)) {
-                        //     available_headings.push_back(fifth_heading);
-                        //     ranges.push_back(diff/4);
-                        // }
-                        // if (!isAngleClose(sixth_heading, available_headings, degree_tolerance)) {
-                        //     available_headings.push_back(sixth_heading);
-                        //     ranges.push_back(diff/4);
-                        // }
+                        if (!isAngleClose(third_heading, available_headings, degree_tolerance)) {
+                            available_headings.push_back(third_heading);
+                            ranges.push_back(diff/4);
+                        }
+                        if (!isAngleClose(fourth_heading, available_headings, degree_tolerance)) {
+                            available_headings.push_back(fourth_heading);
+                            ranges.push_back(diff/4);
+                        }
+                        if (!isAngleClose(fifth_heading, available_headings, degree_tolerance)) {
+                            available_headings.push_back(fifth_heading);
+                            ranges.push_back(diff/4);
+                        }
+                        if (!isAngleClose(sixth_heading, available_headings, degree_tolerance)) {
+                            available_headings.push_back(sixth_heading);
+                            ranges.push_back(diff/4);
+                        }
                         
                     }
                    
@@ -407,8 +407,8 @@ private:
         }
 
         // Debugging logs
-        RCLCPP_WARN(this->get_logger(), "no_pcl: %d, no_obstacles: %d", no_pcl, no_obstacles);
-        RCLCPP_WARN(this->get_logger(), "Available headings size: %zu", available_headings.size());
+        //RCLCPP_WARN(this->get_logger(), "no_pcl: %d, no_obstacles: %d", no_pcl, no_obstacles);
+        //RCLCPP_WARN(this->get_logger(), "Available headings size: %zu", available_headings.size());
 
         // Close the file
         angle_file.close();
