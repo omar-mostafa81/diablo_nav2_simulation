@@ -23,7 +23,7 @@ def generate_launch_description():
     #after installing:
     #sudo apt install ros-<ros2-distro>-turtlebot3-gazebo
     #world_path=os.path.join(pkg_share, '/opt/ros/humble/share/turtlebot3_gazebo/worlds/turtlebot3_house.world')
-    world_path=os.path.join(pkg_share, 'world/F1-apartment.sdf')
+    world_path=os.path.join(pkg_share, 'world/alpha_0.2.sdf')
 
     
     robot_state_publisher_node = launch_ros.actions.Node(
@@ -57,8 +57,8 @@ def generate_launch_description():
         arguments=[
             '-entity', 'diablo', 
             '-topic', 'robot_description',
-            '-x', '-0.5', '-y', '7.0', '-z', '0.2'
-            , '-Y', '-1.57'
+            '-x', '0.45', '-y', '-8.6', '-z', '0.2'
+            , '-Y', '1.57'
         ],
         output='screen'
     )
@@ -95,6 +95,13 @@ def generate_launch_description():
                 'Reg/Force3DoF': "true",
                 'Grid/FromDepth': 'True',
                 'Grid/RayTracing': 'True',
+                #Parameters for ground/obstacles detection
+                'Grid/GroundIsObstacle': "false",
+                'Grid/NormalsSegmentation': "false",
+                'Grid/MaxGroundHeight':"0.10", #should be set if normalSegmentation = False
+		        'Grid/MaxObstacleHeight':"0.8",
+                # Limiting the lidar
+                #'Grid/RangeMax':"5.0",
 		    }],
             remappings=[
                         ('imu', '/diablo/imu'),

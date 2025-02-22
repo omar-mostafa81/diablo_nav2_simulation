@@ -158,7 +158,7 @@ def generate_launch_description():
                 respawn_delay=2.0,
                 parameters=[configured_params],
                 arguments=['--ros-args', '--log-level', log_level],
-                remappings=remappings + [('cmd_vel', '/diablo/cmd_vel')],
+                remappings=remappings + [('cmd_vel', '/cmd_vel')],
             ),
             Node(
                 package='nav2_smoother',
@@ -191,7 +191,7 @@ def generate_launch_description():
                 respawn_delay=2.0,
                 parameters=[configured_params],
                 arguments=['--ros-args', '--log-level', log_level],
-                remappings=remappings + [('cmd_vel', '/diablo/cmd_vel')],
+                remappings=remappings + [('cmd_vel', '/cmd_vel')],
             ),
             Node(
                 package='nav2_bt_navigator',
@@ -224,7 +224,9 @@ def generate_launch_description():
                 respawn_delay=2.0,
                 parameters=[configured_params],
                 arguments=['--ros-args', '--log-level', log_level],
-                remappings=remappings + [('cmd_vel_smoothed', '/diablo/cmd_vel')]
+                #remappings=remappings + [('cmd_vel_smoothed', '/diablo/cmd_vel')]
+                # for experiment purposes, sat cmd_vel to a dummy topic so the robot doesn't move
+                remappings=remappings + [('cmd_vel_smoothed', '/cmd_vel')]
                 #+ [('cmd_vel', '/diablo/cmd_vel')],
             ),
             Node(

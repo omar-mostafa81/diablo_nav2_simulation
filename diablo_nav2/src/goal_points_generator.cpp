@@ -4,6 +4,7 @@
 #include "motion_msgs/msg/motion_ctrl.hpp"
 #include "std_msgs/msg/float64.hpp"
 #include <std_msgs/msg/float64_multi_array.hpp>
+#include "std_msgs/msg/bool.hpp"
 #include <chrono>
 #include <functional>
 #include <memory>
@@ -192,6 +193,10 @@ public:
             "/goal_pose", 10,
             std::bind(&GoalPointsGenerator::onGoalPoseReceived, this, std::placeholders::_1));
 
+        terminate_goal_subscriber_ = this->create_subscription<std_msgs::msg::Bool>(
+            "/terminate_goal", 10,
+            std::bind(&GoalPointsGenerator::terminateGoalCallback, this, std::placeholders::_1));
+
         explore_timer_ = this->create_wall_timer(
         std::chrono::milliseconds(100), std::bind(&GoalPointsGenerator::explore, this));
 
@@ -216,7 +221,7 @@ public:
         visited_waypoints_->insert(current_waypoint);
 
         wp_ForwardYawTolerance = 45; wp_BackwardYawTolerance = 10.0; wp_Radius = 0.38;
-
+        activate_exploration = false;
     }
 
 private:
@@ -446,12 +451,36 @@ private:
         }
     }
 
+    void terminateGoalCallback(const std_msgs::msg::Bool::SharedPtr msg)
+    {
+        if (msg->data) {
+            RCLCPP_INFO(this->get_logger(), "Termination request received. Canceling the current goal.");
+
+            // Check if there is an active goal
+            if (navigate_to_pose_client_) {
+                //auto goal_handle = navigate_to_pose_client_->get_current_goal();
+                //if (goal_handle) {
+                    // Send a cancel request to the action server
+                    navigate_to_pose_client_->async_cancel_all_goals(
+                        [](const auto &result) {
+                            RCLCPP_INFO(rclcpp::get_logger("GoalPointsGenerator"), "Goal canceled.");
+                        });
+                    goal_reached_ = true;  // Reset goal status
+                //} else {
+                //    RCLCPP_WARN(this->get_logger(), "No active goal to cancel.");
+                //}
+            } else {
+                RCLCPP_WARN(this->get_logger(), "Action client is not initialized.");
+            }
+        }
+    }
+
     void explore()
     {
         if (goal_reached_ || !first_goal_received)
         {
             // Check if more than 10 seconds have passed since the last heading message
-            if ((this->now() - last_heading_time_).seconds() > 10.0)
+            if ((this->now() - last_heading_time_).seconds() > 10.0 && activate_exploration)
             {
                 RCLCPP_INFO(this->get_logger(), "No heading message received for 10 seconds.");
                 
@@ -1179,6 +1208,8 @@ private:
     rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr headings_subscriber;
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_subscriber;
     rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr velocity_subscriber;
+    rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr terminate_goal_subscriber_;
+
     rclcpp::Subscription<std_msgs::msg::Float64MultiArray>::SharedPtr available_headings_subscriber_;
     rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr goal_pose_subscriber_;
     rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr goal_publisher;
@@ -1203,6 +1234,7 @@ private:
     int exploration_step;
     double wp_Radius, wp_ForwardYawTolerance, wp_BackwardYawTolerance;
 
+    bool activate_exploration;
     // Declare the waypoints container
     std::shared_ptr<std::unordered_set<Waypoint>> visited_waypoints_;
 

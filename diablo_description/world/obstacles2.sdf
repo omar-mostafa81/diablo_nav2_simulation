@@ -87,42 +87,62 @@
       <heading_deg>0</heading_deg>
     </spherical_coordinates>
     <state world_name='default'>
-      <sim_time>548 739000000</sim_time>
-      <real_time>552 848800485</real_time>
-      <wall_time>1732020575 186809165</wall_time>
-      <iterations>548739</iterations>
+      <sim_time>864 502000000</sim_time>
+      <real_time>317 679017474</real_time>
+      <wall_time>1732086495 173360812</wall_time>
+      <iterations>315763</iterations>
+      <model name='aws_robomaker_residential_TVCabinet_01'>
+        <pose>1.63163 1.32196 0 0 -0 0.489331</pose>
+        <scale>1 1 1</scale>
+        <link name='link'>
+          <pose>1.63163 1.32196 0 0 -0 0.489331</pose>
+          <velocity>0 0 0 0 -0 0</velocity>
+          <acceleration>0 0 0 0 -0 0</acceleration>
+          <wrench>0 0 0 0 -0 0</wrench>
+        </link>
+      </model>
+      <model name='aws_robomaker_residential_TVCabinet_01_clone'>
+        <pose>0.645253 -0.375935 0 0 -0 1.58292</pose>
+        <scale>1 1 1</scale>
+        <link name='link'>
+          <pose>0.645253 -0.375935 0 0 -0 1.58292</pose>
+          <velocity>0 0 0 0 -0 0</velocity>
+          <acceleration>0 0 0 0 -0 0</acceleration>
+          <wrench>0 0 0 0 -0 0</wrench>
+        </link>
+      </model>
       <model name='diablo'>
-        <pose>0.471024 0.206707 0.200002 -1e-06 0.001229 1.49294</pose>
+        <pose>0.478648 0.338294 0.200002 -1e-06 0.00123 1.52282</pose>
         <scale>1 1 1</scale>
         <link name='back_caster'>
-          <pose>0.460121 0.066947 0.050174 -0.07313 0.001229 1.49294</pose>
-          <velocity>-5e-05 -0.000425 -2.5e-05 -0.001692 -1.2e-05 0.000162</velocity>
-          <acceleration>-0.166049 -1.39504 -0.006771 -2.96146 0.23109 0.052923</acceleration>
-          <wrench>-0.00166 -0.01395 -6.8e-05 0 -0 0</wrench>
+          <pose>0.471924 0.198271 0.050174 -0.116625 0.00123 1.52282</pose>
+          <velocity>7.8e-05 0.000988 1.8e-05 0.001027 -0.000182 4.6e-05</velocity>
+          <acceleration>0.121235 1.40009 0.00752 2.96817 -0.142586 -0.049777</acceleration>
+          <wrench>0.001212 0.014001 7.5e-05 0 -0 0</wrench>
         </link>
         <link name='base_link'>
-          <pose>0.471024 0.206707 0.200002 -1e-06 0.001229 1.49294</pose>
-          <velocity>-4.2e-05 -0.000172 -0.000261 -0.001671 0.000199 0.000162</velocity>
-          <acceleration>0.009589 0.170007 -0.47699 -2.13523 0.412917 0.044904</acceleration>
-          <wrench>0.146325 2.59431 -7.27886 0 -0 0</wrench>
+          <pose>0.478648 0.338294 0.200002 -1e-06 0.00123 1.52282</pose>
+          <velocity>5.7e-05 0.000834 0.000163 0.001028 -9.6e-05 4.7e-05</velocity>
+          <acceleration>-0.005158 -0.170211 0.477922 2.14535 -0.308495 -0.041885</acceleration>
+          <wrench>-0.078704 -2.59743 7.29308 0 -0 0</wrench>
         </link>
         <link name='drivewhl_l_link'>
-          <pose>0.29156 0.220583 0.1 -2.9e-05 0.180385 1.49294</pose>
-          <velocity>9.3e-05 -2.9e-05 0.000137 -0.000147 0.001067 -0.001998</velocity>
-          <acceleration>0.112887 -0.681241 0.254791 0.067137 0.503959 -0.467048</acceleration>
-          <wrench>0.056444 -0.34062 0.127396 0 -0 0</wrench>
+          <pose>0.298849 0.346803 0.1 -0.000146 1.40589 1.52268</pose>
+          <velocity>-3.9e-05 0.000689 -0.000119 -0.006418 -0.000397 0.001549</velocity>
+          <acceleration>-0.1368 0.677331 -0.256649 -0.011312 -0.201176 0.471322</acceleration>
+          <wrench>-0.0684 0.338666 -0.128325 0 -0 0</wrench>
         </link>
         <link name='drivewhl_r_link'>
-          <pose>0.650469 0.192584 0.1 1.9e-05 -0.136488 1.49293</pose>
-          <velocity>-9.3e-05 2.1e-05 0.000137 -0.000708 -0.000947 0.002414</velocity>
-          <acceleration>-0.213379 -0.675628 0.255106 -0.224606 0.591736 0.732417</acceleration>
-          <wrench>-0.10669 -0.337814 0.127553 0 -0 0</wrench>
+          <pose>0.658434 0.329537 0.1 4e-05 1.2015 1.52284</pose>
+          <velocity>9.9e-05 0.000715 -0.000118 -0.00667 0.000959 -0.001525</velocity>
+          <acceleration>0.190371 0.682419 -0.254725 0.135796 -0.319458 -0.733341</acceleration>
+          <wrench>0.095186 0.34121 -0.127362 0 -0 0</wrench>
         </link>
         <link name='front_caster'>
-          <pose>0.481898 0.346097 0.049982 0.617928 0.001299 1.49294</pose>
-          <velocity>-5.9e-05 1.2e-05 -0.038608 0.015753 -0.001063 0.000162</velocity>
-          <acceleration>-0.117823 -0.630015 -65.8269 -0.244018 -0.955003 -3.08887</acceleration>
-          <wrench>-0.001178 -0.0063 -0.658269 0 -0 0</wrench>
+          <pose>0.485353 0.477946 0.050021 0.714708 0.001317 1.52282</pose>
+          <velocity>4.7e-05 0.000657 0.027259 -0.012573 0.000915 4.6e-05</velocity>
+          <acceleration>0.095268 0.633062 65.9868 -2.9783 1.35003 -0.049593</acceleration>
+          <wrench>0.000953 0.006331 0.659868 0 -0 0</wrench>
         </link>
       </model>
       <model name='ground_plane'>
@@ -136,33 +156,43 @@
         </link>
       </model>
       <model name='unit_box'>
-        <pose>-1.38584 0.967808 0.5 0 -0 0.414194</pose>
+        <pose>-1.38585 0.967809 0.499995 -1e-05 -0 0.414188</pose>
         <scale>1 1 1</scale>
         <link name='link'>
-          <pose>-1.38584 0.967808 0.5 0 -0 0.414194</pose>
+          <pose>-1.38585 0.967809 0.499995 -1e-05 -0 0.414188</pose>
           <velocity>0 0 0 0 -0 0</velocity>
-          <acceleration>-8.95106 -3.934 9.7796 1.58572 0.947278 -0.000574</acceleration>
-          <wrench>-8.95106 -3.934 9.7796 0 -0 0</wrench>
-        </link>
-      </model>
-      <model name='unit_box_0'>
-        <pose>2.03082 0.615298 0.500002 0 4e-06 0.236966</pose>
-        <scale>1 1 1</scale>
-        <link name='link'>
-          <pose>2.03082 0.615298 0.500002 0 4e-06 0.236966</pose>
-          <velocity>0 0 0 0 -0 0</velocity>
-          <acceleration>-5.38541 -1.28326 -0.572668 -0.570024 1.34591 -3.14022</acceleration>
-          <wrench>-5.38541 -1.28326 -0.572668 0 -0 0</wrench>
+          <acceleration>-0.008989 0.00841 -9.78131 -0.016624 -0.017157 0.000582</acceleration>
+          <wrench>-0.008989 0.00841 -9.78131 0 -0 0</wrench>
         </link>
       </model>
       <model name='unit_box_clone'>
-        <pose>-0.467661 1.36404 0.5 0 -0 0.414191</pose>
+        <pose>-0.46765 1.36404 0.499995 1e-05 -0 0.414185</pose>
         <scale>1 1 1</scale>
         <link name='link'>
-          <pose>-0.467661 1.36404 0.5 0 -0 0.414191</pose>
+          <pose>-0.46765 1.36404 0.499995 1e-05 -0 0.414185</pose>
           <velocity>0 0 0 0 -0 0</velocity>
-          <acceleration>8.9511 3.93429 9.7794 -1.58623 -0.947206 -0.000526</acceleration>
-          <wrench>8.9511 3.93429 9.7794 0 -0 0</wrench>
+          <acceleration>0.008989 -0.00841 -9.78131 0.016624 0.017157 0.000582</acceleration>
+          <wrench>0.008989 -0.00841 -9.78131 0 -0 0</wrench>
+        </link>
+      </model>
+      <model name='unit_box_clone_0'>
+        <pose>-1.26485 -0.54956 0.499995 0 1e-05 -0.013518</pose>
+        <scale>1 1 1</scale>
+        <link name='link'>
+          <pose>-1.26485 -0.54956 0.499995 0 1e-05 -0.013518</pose>
+          <velocity>0 0 0 0 -0 0</velocity>
+          <acceleration>0.010513 -0.0062 -9.78234 0.012397 0.021027 3e-06</acceleration>
+          <wrench>0.010513 -0.0062 -9.78234 0 -0 0</wrench>
+        </link>
+      </model>
+      <model name='unit_box_clone_0_clone'>
+        <pose>0.016502 2.71453 0.499995 -1e-05 -0 0.412801</pose>
+        <scale>1 1 1</scale>
+        <link name='link'>
+          <pose>0.016502 2.71453 0.499995 -1e-05 -0 0.412801</pose>
+          <velocity>0 0 0 0 -0 0</velocity>
+          <acceleration>-0.008977 0.008418 -9.78132 -0.016639 -0.017128 0.000585</acceleration>
+          <wrench>-0.008977 0.008418 -9.78132 0 -0 0</wrench>
         </link>
       </model>
       <light name='sun'>
@@ -171,7 +201,7 @@
     </state>
     <gui fullscreen='0'>
       <camera name='user_camera'>
-        <pose>1.58469 -1.05854 9.75734 0 1.5418 1.58017</pose>
+        <pose>1.34958 -0.324731 10.0041 2.8e-05 1.5698 1.53619</pose>
         <view_controller>orbit</view_controller>
         <projection_type>perspective</projection_type>
       </camera>
@@ -784,8 +814,8 @@
         <kinematic>0</kinematic>
       </link>
     </model>
-    <model name='unit_box_0'>
-      <pose>2.24269 1.36109 0.5 0 -0 0</pose>
+    <model name='unit_box_clone'>
+      <pose>-0.182322 1.27229 0.5 0 -0 0.298295</pose>
       <link name='link'>
         <inertial>
           <mass>1</mass>
@@ -837,8 +867,163 @@
         <kinematic>0</kinematic>
       </link>
     </model>
-    <model name='unit_box_clone'>
-      <pose>-0.182322 1.27229 0.5 0 -0 0.298295</pose>
+    <model name='aws_robomaker_residential_TVCabinet_01'>
+      <link name='link'>
+        <inertial>
+          <mass>59.2</mass>
+          <inertia>
+            <ixx>30.4</ixx>
+            <ixy>0</ixy>
+            <ixz>0</ixz>
+            <iyy>2.56</iyy>
+            <iyz>0</iyz>
+            <izz>31.38</izz>
+          </inertia>
+        </inertial>
+        <collision name='collision'>
+          <geometry>
+            <mesh>
+              <uri>model://aws_robomaker_residential_TVCabinet_01/meshes/aws_TVCabinet_01_collision.DAE</uri>
+              <scale>1 1 1</scale>
+            </mesh>
+          </geometry>
+          <max_contacts>10</max_contacts>
+          <surface>
+            <contact>
+              <ode/>
+            </contact>
+            <bounce/>
+            <friction>
+              <torsional>
+                <ode/>
+              </torsional>
+              <ode/>
+            </friction>
+          </surface>
+        </collision>
+        <visual name='visual'>
+          <geometry>
+            <mesh>
+              <uri>model://aws_robomaker_residential_TVCabinet_01/meshes/aws_TVCabinet_01_visual.DAE</uri>
+            </mesh>
+          </geometry>
+          <meta>
+            <layer>1</layer>
+          </meta>
+        </visual>
+        <self_collide>0</self_collide>
+        <enable_wind>0</enable_wind>
+        <kinematic>0</kinematic>
+      </link>
+      <static>1</static>
+      <pose>1.9686 0.522359 0 0 -0 0</pose>
+    </model>
+    <model name='aws_robomaker_residential_TVCabinet_01_clone'>
+      <link name='link'>
+        <inertial>
+          <mass>59.2</mass>
+          <inertia>
+            <ixx>30.4</ixx>
+            <ixy>0</ixy>
+            <ixz>0</ixz>
+            <iyy>2.56</iyy>
+            <iyz>0</iyz>
+            <izz>31.38</izz>
+          </inertia>
+        </inertial>
+        <collision name='collision'>
+          <geometry>
+            <mesh>
+              <uri>model://aws_robomaker_residential_TVCabinet_01/meshes/aws_TVCabinet_01_collision.DAE</uri>
+              <scale>1 1 1</scale>
+            </mesh>
+          </geometry>
+          <max_contacts>10</max_contacts>
+          <surface>
+            <contact>
+              <ode/>
+            </contact>
+            <bounce/>
+            <friction>
+              <torsional>
+                <ode/>
+              </torsional>
+              <ode/>
+            </friction>
+          </surface>
+        </collision>
+        <visual name='visual'>
+          <geometry>
+            <mesh>
+              <uri>model://aws_robomaker_residential_TVCabinet_01/meshes/aws_TVCabinet_01_visual.DAE</uri>
+            </mesh>
+          </geometry>
+          <meta>
+            <layer>1</layer>
+          </meta>
+        </visual>
+        <self_collide>0</self_collide>
+        <enable_wind>0</enable_wind>
+        <kinematic>0</kinematic>
+      </link>
+      <static>1</static>
+      <pose>0.796926 -1.29822 0 0 -0 0.489331</pose>
+    </model>
+    <model name='unit_box_clone_0'>
+      <pose>-1.55882 -0.69019 0.499995 1e-05 -0 0.41419</pose>
+      <link name='link'>
+        <inertial>
+          <mass>1</mass>
+          <inertia>
+            <ixx>0.166667</ixx>
+            <ixy>0</ixy>
+            <ixz>0</ixz>
+            <iyy>0.166667</iyy>
+            <iyz>0</iyz>
+            <izz>0.166667</izz>
+          </inertia>
+          <pose>0 0 0 0 -0 0</pose>
+        </inertial>
+        <collision name='collision'>
+          <geometry>
+            <box>
+              <size>1 1 1</size>
+            </box>
+          </geometry>
+          <max_contacts>10</max_contacts>
+          <surface>
+            <contact>
+              <ode/>
+            </contact>
+            <bounce/>
+            <friction>
+              <torsional>
+                <ode/>
+              </torsional>
+              <ode/>
+            </friction>
+          </surface>
+        </collision>
+        <visual name='visual'>
+          <geometry>
+            <box>
+              <size>1 1 1</size>
+            </box>
+          </geometry>
+          <material>
+            <script>
+              <name>Gazebo/Grey</name>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+            </script>
+          </material>
+        </visual>
+        <self_collide>0</self_collide>
+        <enable_wind>0</enable_wind>
+        <kinematic>0</kinematic>
+      </link>
+    </model>
+    <model name='unit_box_clone_0_clone'>
+      <pose>0.145277 3.00873 0.5 0 -0 -0.013518</pose>
       <link name='link'>
         <inertial>
           <mass>1</mass>

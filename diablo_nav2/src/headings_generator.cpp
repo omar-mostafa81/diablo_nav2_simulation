@@ -216,7 +216,7 @@ private:
         std::vector<double> available_headings;
         std::vector<double> ranges;
         const double degree_tolerance = 5.0 * M_PI / 180;  // 5 degrees in radians
-        double min_angle = 24 * M_PI / 180; 
+        double min_angle = 28 * M_PI / 180; 
 
         //for (auto it = obstacle_angles.begin(); it != std::prev(obstacle_angles.end()); ++it) {
         for (auto it = obstacle_angles.begin(); it != obstacle_angles.end(); ++it) {
